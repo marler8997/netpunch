@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#
+# manual tests
+#
+# * connect punch-client-forwarder to a server that doesn't respond like a web server
+#
+#       ./zig-cache/bin/punch-client-forwarder 127.0.0.1 80 127.0.0.1 1234
+#
+#   make sure it keeps reconnecting waiting for magic value
+#
+
+set -euo pipefail
+#set -x
+
+rm -rf scratch
+mkdir scratch
+
+trap 'for job in $(jobs -p); do kill -n 9 $job; done' EXIT
+
+###./zig-cache/bin/reverse-tunnel-client 127.0.0.1 > scratch/reverse-tunnel-client.log 2>&1 &
+###reverse_tunnel_client_pid=$! ###
+###./zig-cache/bin/config-server > scratch/config-server1.log 2>&1 &
+###config_server_pid=$!
+#### wait for server to start
+###sleep 1
+###kill -n 9 $config_server_pid
+#### wait for server to exit
+###sleep 1
+###
+###./zig-cache/bin/config-server > scratch/config-server2.log 2>&1 &
+###config_server_pid=$!
+#### wait for server to start
+###sleep 1
+###
+
+set -x
+./zig-cache/bin/punch-client-forwarder 127.0.0.1 9281 127.0.0.1 9287 > scratch/punch-client-forwarder.log 2>&1 &
+punch_client_forwarder_pid=$!
+
+./zig-cache/bin/punch-server-initiator 127.0.0.1 9281 127.0.0.1 9282 > scratch/punch-server-initiator.log 2>&1 &
+punch_server_initiator_pid=$!
+
+./zig-cache/bin/nc -l 9287 > scratch/inside-server.log 2>&1 &
+# allow servers to listen first
+sleep 1
+echo "hello from outside-client" | ./zig-cache/bin/nc 127.0.0.1 9282 > scratch/outside-client.log 2>&1
+
+# give the programs a chance to run
+sleep 3
+exit 1
+
+./zig-cache/bin/config-server > scratch/config-server1.log 2>&1 &
+config_server_pid=$!
+# wait for server to start
+sleep 1
+kill -n 9 $config_server_pid
+# wait for server to exit
+sleep 1
+
+./zig-cache/bin/config-server > scratch/config-server2.log 2>&1 &
+config_server_pid=$!
+# wait for server to start
+sleep 1
+
+echo "" | ./zig-cache/bin/nc 127.0.0.1 9281 | hexdump -C
+
+kill -n 9 $config_server_pid
+
+./zig-cache/bin/double-server > scratch/double-server.log 2>&1 &
+double_server_pid=$!
+# wait for server to start
+sleep 1
+
+echo "" | ./zig-cache/bin/nc 127.0.0.1 9282
+
+echo "killing double-server pid=$double_server_pid..."
+kill -n 9 $double_server_pid
+
+echo Success
