@@ -61,14 +61,12 @@ pub const Proxy = union(enum) {
         self: Proxy,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
-        context: var,
-        comptime Errors: type,
-        comptime output: fn (@TypeOf(context), []const u8) Errors!void,
+        out_stream: var,
     ) !void {
         switch (self) {
             .None => return,
             .Http => |http| {
-                try std.fmt.format(context, Errors, output, "http://{}:{}/", .{http.host, http.port});
+                try std.fmt.format(out_stream, "http://{}:{}/", .{http.host, http.port});
             },
         }
     }
@@ -88,7 +86,7 @@ pub fn sendHttpConnect(sockfd: fd_t, host: []const u8, port: u16) !void {
     const request = std.fmt.bufPrint(&requestBuffer,
         PART1 ++ "{}:{}" ++ PART2 ++ "{}:{}" ++ PART3,
         .{host, port, host, port}) catch |e| switch (e) {
-        error.BufferTooSmall
+        error.NoSpaceLeft
         => std.debug.panic("code bug: HTTP CONNECT requeset buffer {} not big enough", .{MAX_CONNECT_REQUEST}),
     };
     try common.sendfull(sockfd, request, 0);
