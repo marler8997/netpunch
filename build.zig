@@ -31,10 +31,11 @@ pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
 
     const run_step = b.step("run", "Run the app");
-    addTool(b, run_step, target, mode, "config-server", "config-server.zig");
-    addTool(b, run_step, target, mode, "reverse-tunnel-client", "reverse-tunnel-client.zig");
+    //addTool(b, run_step, target, mode, "config-server", "config-server.zig");
+    //addTool(b, run_step, target, mode, "reverse-tunnel-client", "reverse-tunnel-client.zig");
+    addTool(b, run_step, target, mode, "double-server", "double-server.zig");
     addTool(b, run_step, target, mode, "punch-client-forwarder", "punch-client-forwarder.zig");
     addTool(b, run_step, target, mode, "punch-server-initiator", "punch-server-initiator.zig");
-    addTool(b, run_step, target, mode, "double-server", "double-server.zig");
     addTool(b, run_step, target, mode, "nc", "nc.zig");
+    addTool(b, run_step, target, mode, "restarter", "restarter.zig");
 }
