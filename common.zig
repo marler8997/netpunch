@@ -10,6 +10,15 @@ const log = logging.log;
 const fd_t = os.fd_t;
 const Address = std.net.Address;
 
+// TODO: this should go somewhere else (i.e. std.algorithm in D)
+pub fn skipOver(comptime T: type, haystack: *T, needle: []const u8) bool {
+    if (mem.startsWith(u8, haystack.*, needle)) {
+        haystack.* = haystack.*[needle.len..];
+        return true;
+    }
+    return false;
+}
+
 pub fn delaySeconds(seconds: u32, msg: []const u8) void {
     log("waiting {} seconds {}", .{seconds, msg});
     std.time.sleep(@intCast(u64, seconds) * std.time.ns_per_s);

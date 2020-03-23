@@ -7,15 +7,6 @@ const common = @import("./common.zig");
 const assert = std.debug.assert;
 const fd_t = os.fd_t;
 
-// TODO: this should go somewhere else (i.e. std.algorithm in D)
-fn skipOver(comptime T: type, haystack: *T, needle: []const u8) bool {
-    if (mem.startsWith(u8, haystack.*, needle)) {
-        haystack.* = haystack.*[needle.len..];
-        return true;
-    }
-    return false;
-}
-
 const MAX_HOST = 253;
 const MAX_PORT_DIGITS = 5;
 
@@ -146,7 +137,7 @@ pub fn parseProxy(connectSpec: var) !HostAndProxy {
 }
 pub fn parseProxyTyped(comptime String: type, connectSpec: String) !HostAndProxy {
     var rest = connectSpec;
-    if (skipOver(String, &rest, "http://")) {
+    if (common.skipOver(String, &rest, "http://")) {
         const slashIndex = mem.indexOfScalar(u8, rest, '/') orelse
             return error.MissingSlashToDelimitProxy;
         var host = rest[slashIndex + 1..];

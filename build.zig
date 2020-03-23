@@ -37,5 +37,6 @@ pub fn build(b: *Builder) void {
     addTool(b, run_step, target, mode, "punch-client-forwarder", "punch-client-forwarder.zig");
     addTool(b, run_step, target, mode, "punch-server-initiator", "punch-server-initiator.zig");
     addTool(b, run_step, target, mode, "nc", "nc.zig");
+    addTool(b, run_step, target, mode, "socat", "socat.zig");
     addTool(b, run_step, target, mode, "restarter", "restarter.zig");
 }

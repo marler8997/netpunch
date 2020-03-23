@@ -109,6 +109,7 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
                 std.debug.panic("epoll returned 0 with ifinite timeout?", .{});
         }
         // a convenient helper method, might remove this
+        // TODO: should only return EventError, not EventError!void
         pub fn loop(self: *@This()) EventError!void {
             while (true) {
                 try self.handleEventsNoTimeout();
