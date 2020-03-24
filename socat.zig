@@ -15,6 +15,7 @@ const logging = @import("./logging.zig");
 const timing = @import("./timing.zig");
 const eventing = @import("./eventing.zig");
 const netext = @import("./netext.zig");
+const proxy = @import("./proxy.zig");
 
 const fd_t = os.fd_t;
 const Address = net.Address;
@@ -24,6 +25,7 @@ const EventError = error { Disconnect };
 const Eventer = eventing.EventerTemplate(EventError, struct {}, struct {
     inOut: InOut,
 });
+const Proxy = proxy.Proxy;
 
 const global = struct {
     var addr1String: []const u8 = undefined;
@@ -64,6 +66,7 @@ const ConnectPrep = union(enum) {
 
 const Addr = union(enum) {
     TcpConnect: TcpConnect,
+    ProxyConnect: ProxyConnect,
     TcpListen: TcpListen,
 
     pub fn parse(spec: []const u8) !Addr {
@@ -74,6 +77,8 @@ const Addr = union(enum) {
         };
         if (mem.eql(u8, specType, "tcp-connect"))
             return Addr { .TcpConnect = try TcpConnect.parse(rest) };
+        if (mem.eql(u8, specType, "proxy-connect"))
+            return Addr { .ProxyConnect = try ProxyConnect.parse(rest) };
         if (mem.eql(u8, specType, "tcp-listen"))
             return Addr { .TcpListen = try TcpListen.parse(rest) };
 
@@ -83,12 +88,14 @@ const Addr = union(enum) {
     pub fn prepareConnect(self: *const Addr) !ConnectPrep {
         switch (self.*) {
             .TcpConnect => |a| return a.prepareConnect(),
+            .ProxyConnect => |a| return a.prepareConnect(),
             .TcpListen => |a| return a.prepareConnect(),
         }
     }
     pub fn unprepareConnect(self: *const Addr, prep: *const ConnectPrep) void {
         switch (self.*) {
             .TcpConnect => |a| return a.unprepareConnect(prep),
+            .ProxyConnect => |a| return a.unprepareConnect(prep),
             .TcpListen => |a| return a.unprepareConnect(prep),
         }
     }
@@ -96,11 +103,13 @@ const Addr = union(enum) {
     pub fn connect(self: *const Addr, prep: *const ConnectPrep) !InOut {
         switch (self.*) {
             .TcpConnect => |a| return a.connect(prep),
+            .ProxyConnect => |a| return a.connect(prep),
             .TcpListen => |a| return a.connect(prep),
         }
     }
     pub fn connectSqueezeErrors(self: *const Addr, prep: *const ConnectPrep) !InOut {
         return self.connect(prep) catch |e| switch (e) {
+            error.Retry => return error.Retry,
             error.RetryConnect => return error.RetryConnect,
             error.AddressInUse
             ,error.AddressNotAvailable
@@ -128,6 +137,7 @@ const Addr = union(enum) {
     pub fn disconnect(self: *const Addr, inOut: InOut) void {
         switch (self.*) {
             .TcpConnect => |a| return a.disconnect(inOut),
+            .ProxyConnect => |a| return a.disconnect(inOut),
             .TcpListen => |a| return a.disconnect(inOut),
         }
     }
@@ -135,12 +145,14 @@ const Addr = union(enum) {
     pub fn eventerAdd(self: *const Addr, prep: *const ConnectPrep, callback: *Eventer.Callback) !void {
         switch (self.*) {
             .TcpConnect => |a| return a.eventerAdd(prep, callback),
+            .ProxyConnect => |a| return a.eventerAdd(prep, callback),
             .TcpListen => |a| return a.eventerAdd(prep, callback),
         }
     }
     pub fn eventerRemove(self: *const Addr, prep: *const ConnectPrep) void {
         switch (self.*) {
             .TcpConnect => |a| return a.eventerRemove(prep),
+            .ProxyConnect => |a| return a.eventerRemove(prep),
             .TcpListen => |a| return a.eventerRemove(prep),
         }
     }
@@ -176,6 +188,49 @@ const Addr = union(enum) {
         pub fn eventerAdd(self: *const TcpConnect, prep: *const ConnectPrep, callback: *Eventer.Callback) !void {
         }
         pub fn eventerRemove(self: *const TcpConnect, prep: *const ConnectPrep) void {
+        }
+    };
+    pub const ProxyConnect = struct {
+        httpProxy: Proxy,
+        targetHost: []const u8,
+        targetPort: u16,
+        pub fn parse(spec: []const u8) !ProxyConnect {
+            var rest = spec;
+            const proxyHost = peelTo(&rest, ':') orelse {
+                std.debug.warn("Error: 'proxy-connect:{}' missing ':' to delimit proxy-host\n", .{spec});
+                return error.ParseAddrFailed;
+            };
+            const proxyPort = try common.parsePort(peelTo(&rest, ':') orelse {
+                std.debug.warn("Error: 'proxy-connect:{}' missing 2nd ':' to delimit proxy-port\n", .{spec});
+                return error.ParseAddrFailed;
+            });
+            const targetHost = peelTo(&rest, ':') orelse {
+                std.debug.warn("Error: 'proxy-connect:{}' missing the 3rd ':' to delimit host\n", .{spec});
+                return error.ParseAddrFailed;
+            };
+            const targetPort = try common.parsePort(rest);
+            return ProxyConnect {
+                .httpProxy = Proxy { .Http = .{ .host = proxyHost, .port = proxyPort } },
+                .targetHost = targetHost,
+                .targetPort = targetPort,
+            };
+        }
+        pub fn prepareConnect(self: *const ProxyConnect) !ConnectPrep {
+            return ConnectPrep.None;
+        }
+        pub fn unprepareConnect(self: *const ProxyConnect, prep: *const ConnectPrep) void {
+        }
+        pub fn connect(self: *const ProxyConnect, prep: *const ConnectPrep) !InOut {
+            const sockfd = try netext.proxyConnect(&self.httpProxy, self.targetHost, self.targetPort);
+            return InOut { .in = sockfd, .out = sockfd };
+        }
+        pub fn disconnect(self: *const ProxyConnect, inOut: InOut) void {
+            std.debug.assert(inOut.in == inOut.out);
+            common.shutdownclose(inOut.in);
+        }
+        pub fn eventerAdd(self: *const ProxyConnect, prep: *const ConnectPrep, callback: *Eventer.Callback) !void {
+        }
+        pub fn eventerRemove(self: *const ProxyConnect, prep: *const ConnectPrep) void {
         }
     };
     pub const TcpListen = struct {
@@ -402,7 +457,7 @@ fn onRead(isAddr1Read: bool, callback: *Eventer.Callback) EventError!void {
         return error.Disconnect;
     };
     if (length == 0) {
-        log("read returned 0", .{});
+        log("read fd={} returned 0", .{callback.data.inOut.in});
         return error.Disconnect;
     }
     common.writeFull(callback.data.inOut.out, global.buffer[0..length]) catch |e| {
