@@ -165,7 +165,7 @@ fn sequenceConnectRawClient(punchFd: fd_t, heartbeatTimer: *Timer, punchRecvStat
 
 fn waitForOpenTunnelMessage(punchFd: fd_t, heartbeatTimer: *Timer) !void {
     while (true) {
-        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer) catch |e| switch (e) {
+        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer, false) catch |e| switch (e) {
             error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
         };
         var buf: [1]u8 = undefined;
@@ -227,7 +227,7 @@ fn sequenceForwardingLoop(punchFd: fd_t, heartbeatTimer: *Timer, punchRecvState:
     defer eventer.remove(rawFd);
 
     while (true) {
-        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer) catch |e| switch (e) {
+        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer, false) catch |e| switch (e) {
             error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
         };
         //log("[DEBUG] waiting for events (sleep {} ms)...", .{sleepMillis});
@@ -283,7 +283,7 @@ fn onPunchData(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
                 return error.RawSocketDisconnect;
             },
             .ForwardData => |forwardAction| {
-                log("[VERBOSE] forwarding {} bytes to raw socket...", .{forwardAction.data.len});
+                //log("[VERBOSE] forwarding {} bytes to raw socket...", .{forwardAction.data.len});
                 netext.send(eventer.data.rawFd, forwardAction.data, 0) catch |e| switch (e) {
                     error.Disconnected, error.Retry => {
                         log("s={} send failed on raw socket", .{eventer.data.rawFd});

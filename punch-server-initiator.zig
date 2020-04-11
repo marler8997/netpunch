@@ -127,7 +127,7 @@ fn sequenceSetupEventing(punchListenFd: fd_t, punchFd: fd_t, heartbeatTimer: *Ti
     var eventingThrottler = makeThrottler("eventing throttler");
     while (true) {
         eventingThrottler.throttle();
-        _ = punch.util.serviceHeartbeat(punchFd, heartbeatTimer) catch |e| switch (e) {
+        _ = punch.util.serviceHeartbeat(punchFd, heartbeatTimer, false) catch |e| switch (e) {
             error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
         };
         switch (sequenceAcceptRawClient(punchListenFd, punchFd, heartbeatTimer)) {
@@ -220,7 +220,7 @@ fn waitForRawClient(epollfd: fd_t, punchListenFd: fd_t, punchFd: fd_t, heartbeat
     defer eventer.remove(rawListenFd);
 
     while (true) {
-        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer) catch |e| switch (e) {
+        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer, false) catch |e| switch (e) {
             error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
         };
         //log("[DEBUG] waiting for events (sleep {} ms)...", .{sleepMillis});
@@ -284,7 +284,7 @@ fn sequenceForwardingLoop(epollfd: fd_t, punchListenFd: fd_t, punchFd: fd_t, hea
     defer eventer.remove(rawFd);
 
     while (true) {
-        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer) catch |e| switch (e) {
+        const sleepMillis = punch.util.serviceHeartbeat(punchFd, heartbeatTimer, false) catch |e| switch (e) {
             error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
         };
         //log("[DEBUG] waiting for events (sleep {} ms)...", .{sleepMillis});

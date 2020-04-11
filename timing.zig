@@ -155,7 +155,7 @@ pub const makeThrottler = struct {
     logPrefix: []const u8,
     desiredSleepMillis: Timestamp,
     slowRateMillis: Timestamp,
-    pub fn create(self: *makeThrottler) Throttler {
+    pub fn create(self: *const makeThrottler) Throttler {
         return Throttler.init(self.logPrefix, self.desiredSleepMillis, self.slowRateMillis);
     }
 };

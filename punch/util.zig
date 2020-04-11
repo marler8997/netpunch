@@ -58,10 +58,12 @@ pub fn doHandshake(punchFd: fd_t, myRole: proto.Role, recvTimeoutMillis: u32) !v
     }
 }
 
-pub fn serviceHeartbeat(punchFd: fd_t, heartbeatTimer: *Timer) !u32 {
+pub fn serviceHeartbeat(punchFd: fd_t, heartbeatTimer: *Timer, verboseHeartbeats: bool) !u32 {
     switch (heartbeatTimer.check()) {
         .Expired => {
-            log("[VERBOSE] sending heartbeat...", .{});
+            if (verboseHeartbeats) {
+                log("[VERBOSE] sending heartbeat...", .{});
+            }
             punch.util.sendHeartbeat(punchFd) catch |e| switch (e) {
                 error.Disconnected, error.Retry => return error.PunchSocketDisconnect,
             };
