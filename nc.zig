@@ -35,7 +35,7 @@ pub fn main() anyerror!u8 {
     global.stdout = std.io.getStdOut().handle;
     global.stdin = std.io.getStdIn().handle;
 
-    const args = try std.process.argsAlloc(&global.arena.allocator);
+    var args = try std.process.argsAlloc(&global.arena.allocator);
     if (args.len <= 1) {
         usage();
         return 1;

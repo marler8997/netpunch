@@ -301,7 +301,7 @@ fn usage() void {
 
 pub fn main() anyerror!u8 {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    const args = try std.process.argsAlloc(&arena.allocator);
+    var args = try std.process.argsAlloc(&arena.allocator);
     if (args.len <= 1) {
         usage();
         return 1;

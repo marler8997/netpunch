@@ -58,7 +58,7 @@ fn usage() void {
 pub fn main() anyerror!u8 {
     setupSignals();
 
-    const args = try std.process.argsAlloc(&global.arena.allocator);
+    var args = try std.process.argsAlloc(&global.arena.allocator);
     if (args.len <= 1) {
         usage();
         return 1;
