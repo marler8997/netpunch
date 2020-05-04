@@ -59,7 +59,7 @@ fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
     var addr : Address = undefined;
     var addrlen : os.socklen_t = @sizeOf(@TypeOf(addr));
 
-    const newsockfd = try os.accept4(global.listenFd, &addr.any, &addrlen, os.SOCK_NONBLOCK);
+    const newsockfd = try os.accept(global.listenFd, &addr.any, &addrlen, os.SOCK_NONBLOCK);
     errdefer common.shutdownclose(newsockfd);
 
     const ClientInfos = struct { newClient: *Client, otherClient: *Client };

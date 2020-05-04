@@ -76,7 +76,7 @@ pub fn main() anyerror!u8 {
             std.debug.warn("[NC] listening on {}...\n", .{addr});
             var clientAddr : Address = undefined;
             var clientAddrLen : os.socklen_t = @sizeOf(@TypeOf(clientAddr));
-            const clientFd = try os.accept4(listenFd, &clientAddr.any, &clientAddrLen, 0);
+            const clientFd = try os.accept(listenFd, &clientAddr.any, &clientAddrLen, 0);
             std.debug.warn("[NC] accepted client {}\n", .{clientAddr});
             break :initSock clientFd;
         } else {

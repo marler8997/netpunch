@@ -102,7 +102,7 @@ fn sequenceAcceptPunchClient(punchListenFd: fd_t) error {} {
         log("accepting punch client...", .{});
         var clientAddr : Address = undefined;
         var clientAddrLen : os.socklen_t = @sizeOf(@TypeOf(clientAddr));
-        const punchFd = netext.accept4(punchListenFd, &clientAddr.any, &clientAddrLen, 0) catch |e| switch (e) {
+        const punchFd = netext.accept(punchListenFd, &clientAddr.any, &clientAddrLen, 0) catch |e| switch (e) {
             error.ClientDropped, error.Retry => continue,
         };
         defer common.shutdownclose(punchFd);
@@ -307,7 +307,7 @@ fn onRawAcceptForwarding(eventer: *ForwardingEventer, callback: *ForwardingEvent
 fn dropClient(listenFd: fd_t, isPunch: bool) void {
     var addr : Address = undefined;
     var addrLen : os.socklen_t = @sizeOf(Address);
-    const fd = netext.accept4(listenFd, &addr.any, &addrLen, 0) catch |e| switch (e) {
+    const fd = netext.accept(listenFd, &addr.any, &addrLen, 0) catch |e| switch (e) {
         error.ClientDropped => return,
         error.Retry => {
             delaySeconds(1, "before calling accept again...");
@@ -324,7 +324,7 @@ fn onFirstRawAccept(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Call
 
     var addr : Address = undefined;
     var addrLen : os.socklen_t = @sizeOf(Address);
-    const rawFd = netext.accept4(callback.data.fd, &addr.any, &addrLen, 0) catch |e| switch (e) {
+    const rawFd = netext.accept(callback.data.fd, &addr.any, &addrLen, 0) catch |e| switch (e) {
         error.ClientDropped => return,
         error.Retry => {
             delaySeconds(1, "before accepting raw client again...");

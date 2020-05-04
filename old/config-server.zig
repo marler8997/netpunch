@@ -66,7 +66,7 @@ fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
     var addr : Address = undefined;
     var addrlen : os.socklen_t = @sizeOf(@TypeOf(addr));
 
-    const newsockfd = try os.accept4(fd, &addr.any, &addrlen, os.SOCK_NONBLOCK);
+    const newsockfd = try os.accept(fd, &addr.any, &addrlen, os.SOCK_NONBLOCK);
     errdefer common.shutdownclose(newsockfd);
     std.debug.warn("got new client {} from {}\n", .{newsockfd, addr});
 

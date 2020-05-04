@@ -28,6 +28,7 @@ pub fn socket(domain: u32, socketType: u32, proto: u32) !fd_t {
         },
         error.PermissionDenied
         ,error.AddressFamilyNotSupported
+        ,error.SocketTypeNotSupported
         ,error.ProtocolFamilyNotAvailable
         ,error.ProtocolNotSupported
         ,error.Unexpected
@@ -89,6 +90,7 @@ pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !fd_t {
         ,error.DnsAndIPv6NotSupported
         ,error.IsDir
         ,error.FastOpenAlreadyInProgress // this is from sendto, EALREADY, not sure what it means
+        ,error.SocketTypeNotSupported
         => panic("proxy connectHost failed with: {}", .{e}),
     };
 }
@@ -120,6 +122,7 @@ pub fn read(fd: fd_t, buf: []u8) !usize {
     return os.read(fd, buf) catch |e| switch (e) {
         error.BrokenPipe
         ,error.ConnectionResetByPeer
+        ,error.ConnectionTimedOut
         ,error.InputOutput
         => {
             log("read function disconnect error: {}", .{e});
@@ -142,6 +145,7 @@ pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
     return common.recvfullTimeout(sockfd, buf, timeoutMillis) catch |e| switch (e) {
         error.BrokenPipe
         ,error.ConnectionResetByPeer
+        ,error.ConnectionTimedOut
         ,error.InputOutput
         => {
             log("read function disconnect error: {}", .{e});
@@ -219,8 +223,8 @@ pub fn makeListenSock(addr: *std.net.Address, backlog: u32) !fd_t {
     return sockfd;
 }
 
-pub fn accept4(sockfd: fd_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags: u32) !fd_t {
-    return os.accept4(sockfd, addr, addr_size, flags) catch |e| switch (e) {
+pub fn accept(sockfd: fd_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags: u32) !fd_t {
+    return os.accept(sockfd, addr, addr_size, flags) catch |e| switch (e) {
         error.ConnectionAborted
         ,error.ProtocolFailure
         ,error.BlockedByFirewall
@@ -237,6 +241,7 @@ pub fn accept4(sockfd: fd_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags
             return error.Retry;
         },
         error.Unexpected
+        ,error.PermissionDenied
         => panic("accept function failed with: {}", .{e}),
     };
 }

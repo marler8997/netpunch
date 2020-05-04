@@ -127,6 +127,7 @@ const Addr = union(enum) {
                 return error.Retry;
             },
             error.AddressFamilyNotSupported
+            ,error.SocketTypeNotSupported
             ,error.ProtocolFamilyNotAvailable
             ,error.ProtocolNotSupported
             ,error.Unexpected
@@ -263,7 +264,7 @@ const Addr = union(enum) {
             const listenFd = getListenFd(prep);
             var clientAddr : Address = undefined;
             var clientAddrLen : os.socklen_t = @sizeOf(@TypeOf(clientAddr));
-            const clientFd = netext.accept4(listenFd, &clientAddr.any, &clientAddrLen, 0) catch |e| switch (e) {
+            const clientFd = netext.accept(listenFd, &clientAddr.any, &clientAddrLen, 0) catch |e| switch (e) {
                 error.ClientDropped, error.Retry => return error.RetryConnect,
             };
             log("accepted client from {}", .{clientAddr});
@@ -469,7 +470,7 @@ fn onRead(isAddr1Read: bool, callback: *Eventer.Callback) EventError!void {
 fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
     var addr : Address = undefined;
     var addrLen : os.socklen_t = @sizeOf(Address);
-    const fd = netext.accept4(callback.data.inOut.in, &addr.any, &addrLen, 0) catch |e| switch (e) {
+    const fd = netext.accept(callback.data.inOut.in, &addr.any, &addrLen, 0) catch |e| switch (e) {
         error.Retry, error.ClientDropped => return,
     };
     log("s={} already have client, dropping client s={} from {}", .{callback.data.inOut.in, fd, addr});
