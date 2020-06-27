@@ -394,7 +394,7 @@ test "parsePunchMessage" {
     {
         var state : PunchRecvState = PunchRecvState.Initial;
         {
-            var data = ([_]u8 {proto.TwoWayMessage.Heartbeat})[0..];
+            var data : []const u8 = &[_]u8 {proto.TwoWayMessage.Heartbeat};
             switch (try parsePunchMessage(&state, &data)) {
                 .None => {},
                 else => assert(false),
@@ -402,7 +402,7 @@ test "parsePunchMessage" {
             assert(data.len == 0);
         }
         {
-            var data = ([_]u8 {proto.TwoWayMessage.CloseTunnel})[0..];
+            var data : []const u8 = &[_]u8 {proto.TwoWayMessage.CloseTunnel};
             switch (try parsePunchMessage(&state, &data)) {
                 .CloseTunnel => {},
                 else => assert(false),
@@ -410,7 +410,7 @@ test "parsePunchMessage" {
             assert(data.len == 0);
         }
         {
-            var data = ([_]u8 {proto.InitiatorMessage.OpenTunnel})[0..];
+            var data : []const u8 = &[_]u8 {proto.InitiatorMessage.OpenTunnel};
             switch (try parsePunchMessage(&state, &data)) {
                 .OpenTunnel => {},
                 else => assert(false),
@@ -418,7 +418,7 @@ test "parsePunchMessage" {
             assert(data.len == 0);
         }
         blk: {
-            var data = ([_]u8 {10})[0..];
+            var data : []const u8 = &[_]u8 {10};
             _ = parsePunchMessage(&state, &data) catch |e| {
                 assert(e == error.InvalidPunchMessage);
                 break :blk;
@@ -426,7 +426,7 @@ test "parsePunchMessage" {
             assert(false);
         }
         {
-            var data = ([_]u8 {proto.TwoWayMessage.Data,0,0,0,0,0,0,0,0})[0..];
+            var data : []const u8 = &[_]u8 {proto.TwoWayMessage.Data,0,0,0,0,0,0,0,0};
             switch (try parsePunchMessage(&state, &data)) {
                 .None => {},
                 else => assert(false),
@@ -434,7 +434,7 @@ test "parsePunchMessage" {
             assert(data.len == 0);
         }
         {
-            var data = ([_]u8 {proto.TwoWayMessage.Data,0,0,0,0,0,0,0,1,0xa3})[0..];
+            var data : []const u8 = &[_]u8 {proto.TwoWayMessage.Data,0,0,0,0,0,0,0,1,0xa3};
             switch (try parsePunchMessage(&state, &data)) {
                 .ForwardData => |forwardData| assert(std.mem.eql(u8, &[_]u8 {0xa3}, forwardData.data)),
                 else => assert(false),
