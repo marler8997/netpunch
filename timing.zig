@@ -3,22 +3,18 @@ const std = @import("std");
 const logging = @import("./logging.zig");
 const log = logging.log;
 
-pub fn Signed(comptime T: type) type {
-    return
-             if (T == u64) i64
-        else if (T == u32) i32
-        else if (T == u16) i16
-        else if (T ==  u8) i8
-        else @compileError("Signed has not been implemented for this type");
+/// TODO: these functions should go somewhere else
+pub fn SignModified(comptime T: type, comptime is_signed: bool) type {
+    return switch (@typeInfo(T)) {
+        .Int => |info| @Type(std.builtin.TypeInfo{.Int = .{
+            .is_signed = is_signed,
+            .bits = info.bits,
+        }}),
+        else => @compileError("Signed requires an Int type but got: " ++ @typeName(T)),
+    };
 }
-pub fn Unsigned(comptime T: type) type {
-    return
-             if (T == i64) u64
-        else if (T == i32) u32
-        else if (T == i16) u16
-        else if (T ==  i8) u8
-        else @compileError("Unsigned has not been implemented for this type");
-}
+pub fn Signed  (comptime T: type) type { return SignModified(T, true ); }
+pub fn Unsigned(comptime T: type) type { return SignModified(T, false); }
 
 pub const Timestamp = @typeInfo(@TypeOf(std.time.milliTimestamp)).Fn.return_type.?;
 pub const TimestampDiff = Signed(Timestamp);
