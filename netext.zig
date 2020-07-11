@@ -137,6 +137,7 @@ pub fn read(fd: fd_t, buf: []u8) !usize {
         },
         error.IsDir
         ,error.Unexpected
+        ,error.AccessDenied
         => panic("read function failed with: {}", .{e}),
     };
 }
@@ -161,6 +162,7 @@ pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
         },
         error.IsDir
         ,error.Unexpected
+        ,error.AccessDenied
         => panic("read function failed with: {}", .{e}),
     };
 }
