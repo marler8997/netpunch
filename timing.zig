@@ -26,12 +26,12 @@ pub fn getNowTimestamp() Timestamp {
 pub fn timestampToMillis(timestamp: Timestamp) Timestamp {
     return timestamp; // already millis right now
 }
-pub fn secondsToTimestamp(value: var) Timestamp {
+pub fn secondsToTimestamp(value: anytype) Timestamp {
     return 1000 * value;
 }
 
 // 2's complement negate
-pub fn negate(val: var) @TypeOf(val) {
+pub fn negate(val: anytype) @TypeOf(val) {
     var result : @TypeOf(val) = undefined;
     _ = @addWithOverflow(@TypeOf(val), ~val, 1, &result);
     return result;

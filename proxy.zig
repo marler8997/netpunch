@@ -52,7 +52,7 @@ pub const Proxy = union(enum) {
         self: Proxy,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
-        out_stream: var,
+        out_stream: anytype,
     ) !void {
         switch (self) {
             .None => return,
@@ -132,7 +132,7 @@ pub const HostAndProxy = struct {
     }
 };
 
-pub fn parseProxy(connectSpec: var) !HostAndProxy {
+pub fn parseProxy(connectSpec: anytype) !HostAndProxy {
     return parseProxyTyped(@TypeOf(connectSpec), connectSpec);
 }
 pub fn parseProxyTyped(comptime String: type, connectSpec: String) !HostAndProxy {

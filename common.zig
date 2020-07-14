@@ -181,7 +181,7 @@ fn recvfullTimeoutHelper(sockfd: fd_t, buf: []u8, timeoutMillis: i32) !usize {
     return totalReceived;
 }
 
-pub fn getOptArg(args: var, i: *usize) !@TypeOf(args[0]) {
+pub fn getOptArg(args: anytype, i: *usize) !@TypeOf(args[0]) {
     i.* += 1;
     if (i.* >= args.len) {
         std.debug.warn("Error: option '{}' requires an argument\n", .{args[i.* - 1]});
