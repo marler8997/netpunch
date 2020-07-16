@@ -70,7 +70,9 @@ pub fn main() anyerror!u8 {
             var addr = Address.initIp4([4]u8{0,0,0,0}, listenPort);
             const listenFd = try os.socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
             defer os.close(listenFd);
-            try os.setsockopt(listenFd, os.SOL_SOCKET, os.SO_REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
+            if (std.builtin.os.tag != .windows) {
+                try os.setsockopt(listenFd, os.SOL_SOCKET, os.SO_REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
+            }
             try os.bind(listenFd, &addr.any, addr.getOsSockLen());
             try os.listen(listenFd, 1);
             std.debug.warn("[NC] listening on {}...\n", .{addr});

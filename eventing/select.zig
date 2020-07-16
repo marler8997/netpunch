@@ -26,14 +26,14 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
             data: CallbackData,
         };
         pub const CallbackFn = fn(server: *@This(), callback: *Callback) anyerror!void;
-
-        /// data that can be shared between all callbacks
-        eventerData: EventerData,
         const FdInfo = struct {
             fd: fd_t,
             flags: u8,
             callback: *Callback,
         };
+
+        /// data that can be shared between all callbacks
+        eventerData: EventerData,
         fdlist: [64]FdInfo,
         pub fn init(eventerData: EventerData) !@This() {
             var this : @This() = undefined;

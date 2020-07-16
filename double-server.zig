@@ -11,6 +11,9 @@ const Address = net.Address;
 const EventFlags = eventing.EventFlags;
 const Eventer = eventing.EventerTemplate(anyerror, struct {}, struct {});
 
+const INVALID_FD = if(std.builtin.os.tag == .windows) std.os.windows.ws2_32.INVALID_SOCKET
+    else -1;
+
 const Client = struct {
     fd: fd_t,
     callback: Eventer.Callback,
@@ -37,8 +40,8 @@ fn callbackToClient(callback: *Eventer.Callback) *Client {
 }
 
 pub fn main() anyerror!u8 {
-    global.clientA.fd = -1;
-    global.clientB.fd = -1;
+    global.clientA.fd = INVALID_FD;
+    global.clientB.fd = INVALID_FD;
     var eventer = try Eventer.init(.{});
 
     var serverCallback = initServer: {
@@ -64,9 +67,9 @@ fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
 
     const ClientInfos = struct { newClient: *Client, otherClient: *Client };
     var info = clientInit: {
-        if (global.clientA.fd == -1)
+        if (global.clientA.fd == INVALID_FD)
             break :clientInit ClientInfos {.newClient=&global.clientA, .otherClient=&global.clientB};
-        if (global.clientB.fd == -1)
+        if (global.clientB.fd == INVALID_FD)
             break :clientInit ClientInfos {.newClient=&global.clientB, .otherClient=&global.clientA};
 
         std.debug.warn("s={} closing connection from {}, already have 2 clients\n", .{newsockfd, addr});
@@ -75,8 +78,8 @@ fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
     };
 
     std.debug.warn("s={} new client from {}\n", .{newsockfd, addr});
-    errdefer info.newClient.fd = -1;
-    if (info.otherClient.fd == -1 or info.otherClient.callback.func == onDataClosing) {
+    errdefer info.newClient.fd = INVALID_FD;
+    if (info.otherClient.fd == INVALID_FD or info.otherClient.callback.func == onDataClosing) {
         info.newClient.* = Client {
             .fd = newsockfd,
             .callback = Eventer.Callback {
@@ -109,15 +112,15 @@ fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
 fn onDataOneClient(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
     const clientRef = callbackToClient(callback);
     std.debug.warn("s={} connection closed\n", .{clientRef.fd});
-    std.debug.assert(clientRef.fd != -1);
+    std.debug.assert(clientRef.fd != INVALID_FD);
     eventer.remove(clientRef.fd);
     common.shutdownclose(clientRef.fd);
-    clientRef.fd = -1;
+    clientRef.fd = INVALID_FD;
 }
 
 // in this callback, you can assume that both clients are valid and have this callback
 fn onDataTwoClients(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
-    std.debug.assert(global.clientA.fd != -1 and global.clientB.fd != -1);
+    std.debug.assert(global.clientA.fd != INVALID_FD and global.clientB.fd != INVALID_FD);
     std.debug.assert(global.clientA.callback.func == onDataTwoClients);
     std.debug.assert(global.clientB.callback.func == onDataTwoClients);
 
@@ -132,7 +135,7 @@ fn onDataTwoClients(eventer: *Eventer, callback: *Eventer.Callback) anyerror!voi
 fn in_forward_from_closed(eventer: *Eventer, from: *Client, to: *Client) !void {
     eventer.remove(from.fd);
     os.close(from.fd);
-    from.fd = -1;
+    from.fd = INVALID_FD;
 
     if (!global.clientsLinked) {
         std.debug.warn("client's weren't linked, back to one-client s={}\n", .{to.fd});
@@ -179,5 +182,5 @@ fn onDataClosing(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
     std.debug.warn("s={} finishing close\n", .{clientRef.fd});
     eventer.remove(clientRef.fd);
     os.close(clientRef.fd);
-    clientRef.fd = -1;
+    clientRef.fd = INVALID_FD;
 }
