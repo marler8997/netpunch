@@ -47,8 +47,13 @@ fn peelTo(strRef: *[]const u8, to: u8) ?[]const u8 {
     return null;
 }
 
+var noThrottle = false;
 fn makeThrottler(logPrefix: []const u8) timing.Throttler {
-    return (timing.makeThrottler {
+    return if (noThrottle) (timing.makeThrottler {
+        .logPrefix = logPrefix,
+        .desiredSleepMillis = 0,
+        .slowRateMillis = 0,
+    }).create() else (timing.makeThrottler {
         .logPrefix = logPrefix,
         .desiredSleepMillis = 15000,
         .slowRateMillis = 500,
@@ -308,6 +313,24 @@ pub fn main() anyerror!u8 {
         return 1;
     }
     args = args[1..];
+
+    {
+        var newArgsLen : usize = 0;
+        defer args = args[0..newArgsLen];
+        var i : usize = 0;
+        while (i < args.len) : (i += 1) {
+            const arg = args[i];
+            if (!std.mem.startsWith(u8, arg, "-")) {
+                args[newArgsLen] = arg;
+                newArgsLen += 1;
+            } else if (std.mem.eql(u8, arg, "--no-throttle")) {
+                noThrottle = true;
+            } else {
+                std.debug.warn("Error: unknown command-line option '{}'\n", .{arg});
+                return 1;
+            }
+        }
+    }
 
     if (args.len != 2) {
         std.debug.warn("Error: expected 2 command-line arguments but got {}\n", .{args.len});

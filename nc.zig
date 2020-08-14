@@ -28,7 +28,8 @@ const global = struct {
 
 fn usage() void {
     std.debug.warn("Usage: nc [-l PORT]\n", .{});
-    std.debug.warn("       nc HOST PORT\n", .{});
+    std.debug.warn("       nc [-z] HOST PORT\n", .{});
+    std.debug.warn("    -z     Scan for open port without sending data\n", .{});
 }
 
 pub fn main() anyerror!u8 {
@@ -43,6 +44,7 @@ pub fn main() anyerror!u8 {
     args = args[1..];
 
     var optionalListenPort : ?u16 = null;
+    var portScan = false;
     {
         var newArgsLen : usize = 0;
         defer args = args[0..newArgsLen];
@@ -54,8 +56,10 @@ pub fn main() anyerror!u8 {
                 newArgsLen += 1;
             } else if (std.mem.eql(u8, arg, "-l")) {
                 optionalListenPort = common.parsePort(common.getOptArg(args, &i) catch return 1) catch return 1;
+            } else if (std.mem.eql(u8, arg, "-z")) {
+                portScan = true;
             } else {
-                std.debug.warn("Error: unknown command-line option '{}'", .{arg});
+                std.debug.warn("Error: unknown command-line option '{}'\n", .{arg});
                 return 1;
             }
         }
@@ -65,6 +69,10 @@ pub fn main() anyerror!u8 {
         if (optionalListenPort) |listenPort| {
             if (args.len != 0) {
                 usage();
+                return 1;
+            }
+            if (portScan) {
+                std.debug.warn("Error: '-z' (port scan) is not compatible with '-l PORT'\n", .{});
                 return 1;
             }
             var addr = Address.initIp4([4]u8{0,0,0,0}, listenPort);
@@ -98,6 +106,11 @@ pub fn main() anyerror!u8 {
             //break :initSock net.tcpConnectToHost(&global.arena.allocator, "localhost", 9282)).handle;
             const sockFile = try net.tcpConnectToAddress(addr);
             std.debug.warn("[NC] connected\n", .{});
+            if (portScan) {
+                try common.shutdown(sockFile.handle);
+                os.close(sockFile.handle);
+                return 0;
+            }
             break :initSock sockFile.handle;
         }
     };

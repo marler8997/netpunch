@@ -10,12 +10,38 @@
 #
 
 set -euo pipefail
-#set -x
-
-rm -rf scratch
-mkdir scratch
 
 trap 'for job in $(jobs -p); do kill -n 9 $job; done' EXIT
+
+wait_for_port() {
+    host=$1
+    port=$2
+    attempt=0
+    # todo: increase sleep time
+    while true; do
+        attempt=$((attempt+1))
+        if netstat -tln | grep -q ":$port"; then
+            break
+        fi
+        if [ "$attempt" == "6" ]; then
+            echo "ERROR: Port '$port' on host '$host' did not open after $attempt attempts"
+            return 1
+        fi
+        echo "Port '$port' on host '$host' not open on attempt $attempt, waiting..."
+        sleep 0.2
+    done
+    echo "Port '$port' on host '$host' is open ($attempt attempts)"
+}
+
+wait_for_pid() {
+    tail --pid=$1 -f /dev/null
+}
+
+clean_scratch() {
+    rm -rf scratch
+    mkdir scratch
+}
+clean_scratch
 
 ###./zig-cache/bin/reverse-tunnel-client 127.0.0.1 > scratch/reverse-tunnel-client.log 2>&1 &
 ###reverse_tunnel_client_pid=$! ###
@@ -33,9 +59,8 @@ trap 'for job in $(jobs -p); do kill -n 9 $job; done' EXIT
 ###sleep 1
 ###
 
-set -x
-
 test_punch() {
+    clean_scratch
     ./zig-cache/bin/punch-client-forwarder 127.0.0.1 9281 127.0.0.1 9287 > scratch/punch-client-forwarder.log 2>&1 &
     punch_client_forwarder_pid=$!
 
@@ -43,13 +68,41 @@ test_punch() {
     punch_server_initiator_pid=$!
 
     ./zig-cache/bin/nc -l 9287 > scratch/inside-server.log 2>&1 &
-    # allow servers to listen first
-    sleep 1
+    inside_server_pid=$!
+    wait_for_port 127.0.0.1 9287
+    wait_for_port 127.0.0.1 9282
     echo "hello from outside-client" | ./zig-cache/bin/nc 127.0.0.1 9282 > scratch/outside-client.log 2>&1
-
-    # give the programs a chance to run
-    sleep 3
+    wait_for_pid $inside_server_pid
+    grep -q "hello from outside-client" scratch/inside-server.log
 }
+
+test_socat() {
+    clean_scratch
+    for i in {1..5}; do
+        ./zig-cache/bin/socat tcp-listen:1280 tcp-listen:1281 > scratch/temp-socat-double-server-$i.log 2>&1 &
+        socat_double_server_pid=$!
+        wait_for_port 127.0.0.1 1280
+        # kill and restart to make sure immediate restart works
+        kill -n 9 $socat_double_server_pid
+    done
+    # disable throttling so the test runs fast
+    ./zig-cache/bin/socat --no-throttle tcp-listen:1280 tcp-listen:1281 > scratch/socat-double-server-main.log 2>&1 &
+    socat_double_server_pid=$!
+    wait_for_port 127.0.0.1 1280
+    for i in {1..20}; do
+        mkfifo scratch/nc-1280.fifo
+        cat scratch/nc-1280.fifo | ./zig-cache/bin/nc 127.0.0.1 1280 > scratch/nc-1280.log 2>&1 &
+        wait_for_port 127.0.0.1 1281
+        ./zig-cache/bin/nc 127.0.0.1 1281 > scratch/nc-1281.log 2>&1 &
+        nc_1281_pid=$!
+        echo "what" > scratch/nc-1280.fifo
+        wait_for_pid $nc_1281_pid
+        grep -q what scratch/nc-1281.log
+        rm scratch/nc-128*
+    done
+    kill -n 9 $socat_double_server_pid
+}
+
 
 #./zig-cache/bin/config-server > scratch/config-server1.log 2>&1 &
 #config_server_pid=$!
@@ -78,7 +131,7 @@ test_punch() {
 #echo "killing double-server pid=$double_server_pid..."
 #kill -n 9 $double_server_pid
 
-
 test_punch
+test_socat
 
 echo Success

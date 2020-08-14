@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+# Convert the timestamps in a logfile to relative
+import sys
+import fileinput
+
+def main():
+    first_time = None
+    for line in fileinput.input():
+        time_sep_idx = line.find(': ')
+        num = line[:time_sep_idx]
+        content = line[time_sep_idx + 2:]
+
+        if first_time == None:
+            first_time = int(num)
+            time_offset = 0
+        else:
+            time_offset = int(num) - first_time
+            
+        sys.stdout.write("{}: {}".format(time_offset / 1000, content))
+
+main()
