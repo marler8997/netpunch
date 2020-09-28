@@ -73,6 +73,7 @@ pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !fd_t {
         ,error.MessageTooBig
         ,error.BrokenPipe
         ,error.InputOutput
+        ,error.NotOpenForReading
         ,error.OperationAborted
         ,error.HttpProxyDisconnectedDurringReply
         ,error.HttpProxyUnexpectedReply
@@ -124,6 +125,7 @@ pub fn read(fd: fd_t, buf: []u8) !usize {
         ,error.ConnectionResetByPeer
         ,error.ConnectionTimedOut
         ,error.InputOutput
+        ,error.NotOpenForReading
         => {
             log("read function disconnect error: {}", .{e});
             return error.Disconnected;
@@ -148,6 +150,7 @@ pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
         ,error.ConnectionResetByPeer
         ,error.ConnectionTimedOut
         ,error.InputOutput
+        ,error.NotOpenForReading
         => {
             log("read function disconnect error: {}", .{e});
             return error.Disconnected;
@@ -244,6 +247,7 @@ pub fn accept(sockfd: fd_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags:
         },
         error.Unexpected
         ,error.PermissionDenied
+        ,error.SocketNotListening
         => panic("accept function failed with: {}", .{e}),
     };
 }
