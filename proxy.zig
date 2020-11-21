@@ -6,6 +6,7 @@ const common = @import("./common.zig");
 
 const assert = std.debug.assert;
 const fd_t = os.fd_t;
+const socket_t = os.socket_t;
 
 const MAX_HOST = 253;
 const MAX_PORT_DIGITS = 5;
@@ -22,7 +23,7 @@ pub const Proxy = union(enum) {
     // TODO: the HTTP protocol means that we could read data from the target
     //       server during negotiation, so this function would need to support
     //       returning any extra data received from the target server
-    pub fn connectHost(self: *const @This(), host: []const u8, port: u16) !fd_t {
+    pub fn connectHost(self: *const @This(), host: []const u8, port: u16) !socket_t {
         std.debug.assert(host.len <= MAX_HOST);
 
         switch (self.*) {
@@ -63,7 +64,7 @@ pub const Proxy = union(enum) {
     }
 };
 
-pub fn sendHttpConnect(sockfd: fd_t, host: []const u8, port: u16) !void {
+pub fn sendHttpConnect(sockfd: socket_t, host: []const u8, port: u16) !void {
     const PART1 = "CONNECT ";
     const PART2 = " HTTP/1.1\r\nHost: ";
     const PART3 = "\r\n\r\n";

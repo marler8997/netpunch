@@ -6,6 +6,7 @@ const os = std.os;
 const net = std.net;
 
 const fd_t = os.fd_t;
+const socket_t = os.socket_t;
 const Address = net.Address;
 
 const logging = @import("./logging.zig");
@@ -17,7 +18,7 @@ const log = logging.log;
 const Proxy = proxy.Proxy;
 
 /// logs errors and returns either fatal or retry
-pub fn socket(domain: u32, socketType: u32, proto: u32) !fd_t {
+pub fn socket(domain: u32, socketType: u32, proto: u32) !socket_t {
     return os.socket(domain, socketType, proto) catch |e| switch (e) {
         error.ProcessFdQuotaExceeded
         ,error.SystemFdQuotaExceeded
@@ -36,7 +37,7 @@ pub fn socket(domain: u32, socketType: u32, proto: u32) !fd_t {
     };
 }
 
-pub fn connect(sockfd: fd_t, addr: *const Address) !void {
+pub fn connect(sockfd: socket_t, addr: *const Address) !void {
     return common.connect(sockfd, addr) catch |e| switch (e) {
         error.AddressNotAvailable
         ,error.AddressInUse
@@ -57,7 +58,7 @@ pub fn connect(sockfd: fd_t, addr: *const Address) !void {
     };
 }
 
-pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !fd_t {
+pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !socket_t {
     return prox.connectHost(host, port) catch |e| switch (e) {
         error.AddressNotAvailable
         ,error.AddressInUse
@@ -97,7 +98,7 @@ pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !fd_t {
     };
 }
 
-pub fn send(sockfd: fd_t, buf: []const u8, flags: u32) !void {
+pub fn send(sockfd: socket_t, buf: []const u8, flags: u32) !void {
     common.sendfull(sockfd, buf, flags) catch |e| switch (e) {
         error.ConnectionResetByPeer
         ,error.BrokenPipe
@@ -146,7 +147,7 @@ pub fn read(fd: fd_t, buf: []u8) !usize {
     };
 }
 
-pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
+pub fn recvfullTimeout(sockfd: socket_t, buf: []u8, timeoutMillis: u32) !bool {
     return common.recvfullTimeout(sockfd, buf, timeoutMillis) catch |e| switch (e) {
         error.BrokenPipe
         ,error.ConnectionResetByPeer
@@ -172,7 +173,7 @@ pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
     };
 }
 
-pub fn setsockopt(sockfd: fd_t, level: u32, optname: u32, opt: []const u8) !void {
+pub fn setsockopt(sockfd: socket_t, level: u32, optname: u32, opt: []const u8) !void {
     os.setsockopt(sockfd, level, optname, opt) catch |e| switch (e) {
         error.SystemResources
         ,error.NetworkSubsystemFailed
@@ -190,7 +191,7 @@ pub fn setsockopt(sockfd: fd_t, level: u32, optname: u32, opt: []const u8) !void
     };
 }
 
-pub fn bind(sockfd: fd_t, addr: *const os.sockaddr, len: os.socklen_t) !void {
+pub fn bind(sockfd: socket_t, addr: *const os.sockaddr, len: os.socklen_t) !void {
     os.bind(sockfd, addr, len) catch |e| switch (e) {
         error.SystemResources
         ,error.AddressInUse
@@ -213,7 +214,7 @@ pub fn bind(sockfd: fd_t, addr: *const os.sockaddr, len: os.socklen_t) !void {
     };
 }
 
-pub fn listen(sockfd: fd_t, backlog: u31) !void {
+pub fn listen(sockfd: socket_t, backlog: u31) !void {
     os.listen(sockfd, backlog) catch |e| switch (e) {
         error.AddressInUse
         ,error.NetworkSubsystemFailed
@@ -231,7 +232,7 @@ pub fn listen(sockfd: fd_t, backlog: u31) !void {
     };
 }
 
-pub fn makeListenSock(addr: *std.net.Address, backlog: u31) !fd_t {
+pub fn makeListenSock(addr: *std.net.Address, backlog: u31) !socket_t {
     const sockfd = try socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
     errdefer os.close(sockfd);
     try setsockopt(sockfd, os.SOL_SOCKET, os.SO_REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
@@ -240,7 +241,7 @@ pub fn makeListenSock(addr: *std.net.Address, backlog: u31) !fd_t {
     return sockfd;
 }
 
-pub fn accept(sockfd: fd_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags: u32) !fd_t {
+pub fn accept(sockfd: socket_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags: u32) !socket_t {
     return os.accept(sockfd, addr, addr_size, flags) catch |e| switch (e) {
         error.ConnectionAborted
         ,error.ConnectionResetByPeer

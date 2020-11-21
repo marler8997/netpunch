@@ -18,6 +18,7 @@ const netext = @import("./netext.zig");
 const proxy = @import("./proxy.zig");
 
 const fd_t = os.fd_t;
+const socket_t = os.socket_t;
 const Address = net.Address;
 const log = logging.log;
 const EventFlags = eventing.EventFlags;
@@ -65,7 +66,7 @@ const ConnectPrep = union(enum) {
     TcpListen: TcpListen,
 
     pub const TcpListen = struct {
-        listenFd: fd_t,
+        listenFd: socket_t,
     };
 };
 
@@ -256,7 +257,7 @@ const Addr = union(enum) {
             };
             return ConnectPrep { .TcpListen = .{ .listenFd = listenFd } };
         }
-        fn getListenFd(prep: *const ConnectPrep) fd_t {
+        fn getListenFd(prep: *const ConnectPrep) socket_t {
             return switch (prep.*) {
                 .TcpListen => |p| p.listenFd,
                 else => @panic("code bug: connect prep type is wrong"),
@@ -295,7 +296,7 @@ const Addr = union(enum) {
     };
 };
 
-const InOut = struct { in: fd_t, out: fd_t };
+const InOut = struct { in: socket_t, out: socket_t };
 
 fn usage() void {
     std.debug.warn("Usage: socat ADDRESS1 ADDRESS2\n", .{});
@@ -306,6 +307,10 @@ fn usage() void {
 }
 
 pub fn main() anyerror!u8 {
+    if (std.builtin.os.tag == .windows) {
+        _ = try std.os.windows.WSAStartup(2, 2);
+    }
+
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     var args = try std.process.argsAlloc(&arena.allocator);
     if (args.len <= 1) {

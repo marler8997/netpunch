@@ -8,6 +8,7 @@ const timing = @import("./timing.zig");
 const panic = std.debug.panic;
 const log = logging.log;
 const fd_t = os.fd_t;
+const socket_t = os.socket_t;
 const Address = std.net.Address;
 
 // TODO: this should go somewhere else (i.e. std.algorithm in D)
@@ -24,7 +25,7 @@ pub fn delaySeconds(seconds: u32, msg: []const u8) void {
     std.time.sleep(@intCast(u64, seconds) * std.time.ns_per_s);
 }
 
-pub fn makeListenSock(listenAddr: *Address) !fd_t {
+pub fn makeListenSock(listenAddr: *Address) !socket_t {
     var flags : u32 = os.SOCK_STREAM;
     if (std.builtin.os.tag != .windows) {
         flags = flags | os.SOCK_NONBLOCK;
@@ -45,7 +46,7 @@ pub fn makeListenSock(listenAddr: *Address) !fd_t {
     return sockfd;
 }
 
-pub fn getsockerror(sockfd: fd_t) !c_int {
+pub fn getsockerror(sockfd: socket_t) !c_int {
     var errorCode : c_int = undefined;
     var resultLen : os.socklen_t = @sizeOf(c_int);
     switch (os.errno(os.linux.getsockopt(sockfd, os.SOL_SOCKET, os.SO_ERROR, @ptrCast([*]u8, &errorCode), &resultLen))) {
@@ -59,10 +60,10 @@ pub fn getsockerror(sockfd: fd_t) !c_int {
     }
 }
 
-pub fn connect(sockfd: fd_t, addr: *const Address) os.ConnectError!void {
+pub fn connect(sockfd: socket_t, addr: *const Address) os.ConnectError!void {
     return os.connect(sockfd, &addr.any, addr.getOsSockLen());
 }
-pub fn connectHost(host: []const u8, port: u16) !fd_t {
+pub fn connectHost(host: []const u8, port: u16) !socket_t {
     // so far only ipv4 addresses supported
     const addr = Address.parseIp4(host, port) catch
         return error.DnsAndIPv6NotSupported;
@@ -72,24 +73,69 @@ pub fn connectHost(host: []const u8, port: u16) !fd_t {
     return sockfd;
 }
 
-pub fn shutdown(sockfd: fd_t) !void {
-    switch (os.errno(os.linux.shutdown(sockfd, os.SHUT_RDWR))) {
+const extern_windows = struct {
+    pub extern "ws2_32" fn shutdown(
+        s: socket_t,
+        how: c_int
+    ) callconv(.Stdcall) c_int;
+    pub const SD_BOTH = 2;
+};
+
+// TODO: move to standard library
+pub const ShutdownError = error{
+    ConnectionAborted,
+
+    /// Connection was reset by peer, application should close socket as it is no longer usable.
+    ConnectionResetByPeer,
+
+    BlockingOperationInProgress,
+
+    /// Shutdown was passed an invalid "how" argument
+    InvalidShutdownHow,
+
+    /// The network subsystem has failed.
+    NetworkSubsystemFailed,
+
+    /// The socket is not connected (connection-oriented sockets only).
+    SocketNotConnected,
+
+    /// The file descriptor sockfd does not refer to a socket.
+    FileDescriptorNotASocket,
+
+    SystemResources
+} || std.os.UnexpectedError;
+
+pub fn shutdown(sockfd: socket_t) ShutdownError!void {
+    if (std.builtin.os.tag == .windows) {
+        const result = extern_windows.shutdown(sockfd, extern_windows.SD_BOTH);
+        if (0 != result) switch (std.os.windows.ws2_32.WSAGetLastError()) {
+            .WSAECONNABORTED => return error.ConnectionAborted,
+            .WSAECONNRESET => return error.ConnectionResetByPeer,
+            .WSAEINPROGRESS => return error.BlockingOperationInProgress,
+            .WSAEINVAL => return error.InvalidShutdownHow,
+            .WSAENETDOWN => return error.NetworkSubsystemFailed,
+            .WSAENOTCONN => return error.SocketNotConnected,
+            .WSAENOTSOCK => return error.FileDescriptorNotASocket,
+            .WSANOTINITIALISED => unreachable,
+            else => |err| return std.os.windows.unexpectedWSAError(err),
+        };
+    } else switch (os.errno(os.linux.shutdown(sockfd, os.SHUT_RDWR))) {
         0 => return,
-        os.EBADF => return error.BadFileDescriptor,
-        os.EINVAL => unreachable,
-        os.ENOTCONN => return, // already shutdown
-        os.ENOTSOCK => return error.BadFileDescriptor,
-        os.ENOBUFS => return error.OutOfResources,
+        os.EBADF => unreachable,
+        os.EINVAL => return error.InvalidShutdownHow,
+        os.ENOTCONN => return error.SocketNotConnected,
+        os.ENOTSOCK => return error.FileDescriptorNotASocket,
+        os.ENOBUFS => return error.SystemResources,
         else => |err| return os.unexpectedErrno(err),
     }
 }
 
-pub fn shutdownclose(sockfd: fd_t) void {
+pub fn shutdownclose(sockfd: socket_t) void {
     shutdown(sockfd) catch { }; // ignore error
     os.close(sockfd);
 }
 
-pub fn sendfull(sockfd: fd_t, buf: []const u8, flags: u32) !void {
+pub fn sendfull(sockfd: socket_t, buf: []const u8, flags: u32) !void {
     var totalSent : usize = 0;
     while (totalSent < buf.len) {
         const lastSent = try os.send(sockfd, buf[totalSent..], flags);
@@ -140,7 +186,7 @@ pub fn waitWriteableTimeout(fd: fd_t, timeoutMillis: i32) !bool {
     return waitGenericTimeout(fd, timeoutMillis, os.POLLOUT);
 }
 
-pub fn recvfull(sockfd: fd_t, buf: []u8) !void {
+pub fn recvfull(sockfd: socket_t, buf: []u8) !void {
     var totalReceived : usize = 0;
     while (totalReceived < buf.len) {
         const lastReceived = try os.read(sockfd, buf[totalSent..]);
@@ -150,7 +196,7 @@ pub fn recvfull(sockfd: fd_t, buf: []u8) !void {
         return error.NotImplemented;
     }
 }
-pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
+pub fn recvfullTimeout(sockfd: socket_t, buf: []u8, timeoutMillis: u32) !bool {
     var newTimeoutMillis = timeoutMillis;
     var totalReceived : usize = 0;
     while (newTimeoutMillis > @intCast(u32, std.math.maxInt(i32))) {
@@ -162,7 +208,7 @@ pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
     totalReceived += try recvfullTimeoutHelper(sockfd, buf[totalReceived..], @intCast(i32, newTimeoutMillis));
     return totalReceived == buf.len;
 }
-fn recvfullTimeoutHelper(sockfd: fd_t, buf: []u8, timeoutMillis: i32) !usize {
+fn recvfullTimeoutHelper(sockfd: socket_t, buf: []u8, timeoutMillis: i32) !usize {
     std.debug.assert(timeoutMillis >= 0); // code bug otherwise
     var totalReceived : usize = 0;
     if (buf.len > 0) {
@@ -206,7 +252,7 @@ pub fn parseIp4(s: []const u8, port: u16) !Address {
     };
 }
 
-pub fn eventerAdd(comptime Eventer: type, eventer: *Eventer, fd: fd_t, flags: u32, callback: *Eventer.Callback) !void {
+pub fn eventerAdd(comptime Eventer: type, eventer: *Eventer, fd: Eventer.Fd, flags: u32, callback: *Eventer.Callback) !void {
     eventer.add(fd, flags, callback) catch |e| switch (e) {
         error.SystemResources
         ,error.UserResourceLimitReached

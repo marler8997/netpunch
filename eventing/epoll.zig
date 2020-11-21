@@ -3,6 +3,7 @@ const os = std.os;
 
 const timing = @import("./timing.zig");
 const logging = @import("../logging.zig");
+const common = @import("./common.zig");
 
 const fd_t = os.fd_t;
 const log = logging.log;
@@ -15,6 +16,7 @@ pub const EventFlags = struct {
 
 pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, comptime CallbackData: type) type {
     return struct {
+        pub const Fd = fd_t;
         pub const EventerErrorAlias = EventerError;
         pub const EventerDataAlias = EventerData;
         pub const Callback = struct {
@@ -48,14 +50,14 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
                 os.close(self.epollfd);
         }
 
-        pub fn add(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) !void {
+        pub fn add(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerAddError!void {
             var event = os.epoll_event {
                 .events = flags,
                 .data = os.epoll_data { .ptr = @ptrToInt(callback) },
             };
             try os.epoll_ctl(self.epollfd, os.EPOLL_CTL_ADD, fd, &event);
         }
-        pub fn modify(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) !void {
+        pub fn modify(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerModifyError!void {
             var event = os.epoll_event {
                 .events = flags,
                 .data = os.epoll_data { .ptr = @ptrToInt(callback) },
