@@ -85,6 +85,7 @@ pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !fd_t {
         ,error.PermissionDenied
         ,error.AddressFamilyNotSupported
         ,error.Unexpected
+        ,error.FileDescriptorNotASocket
         ,error.FileNotFound
         ,error.ProtocolFamilyNotAvailable
         ,error.ProtocolNotSupported
@@ -114,6 +115,7 @@ pub fn send(sockfd: fd_t, buf: []const u8, flags: u32) !void {
         },
         error.AccessDenied
         ,error.FastOpenAlreadyInProgress // don't know what this is
+        ,error.FileDescriptorNotASocket
         ,error.Unexpected
         => panic("send function failed with: {}", .{e}),
     };
@@ -173,13 +175,16 @@ pub fn recvfullTimeout(sockfd: fd_t, buf: []u8, timeoutMillis: u32) !bool {
 pub fn setsockopt(sockfd: fd_t, level: u32, optname: u32, opt: []const u8) !void {
     os.setsockopt(sockfd, level, optname, opt) catch |e| switch (e) {
         error.SystemResources
+        ,error.NetworkSubsystemFailed
         => {
             log("WARNING: setsockopt function error: {}", .{e});
             return error.Retry;
         },
         error.InvalidProtocolOption
+        ,error.FileDescriptorNotASocket
         ,error.TimeoutTooBig
         ,error.AlreadyConnected
+        ,error.SocketNotBound
         ,error.Unexpected
         => panic("setsockopt function fatal with: {}", .{e}),
     };
@@ -190,13 +195,16 @@ pub fn bind(sockfd: fd_t, addr: *const os.sockaddr, len: os.socklen_t) !void {
         error.SystemResources
         ,error.AddressInUse
         ,error.AddressNotAvailable
+        ,error.NetworkSubsystemFailed
         => {
             log("WARNING: bind function error: {}", .{e});
             return error.Retry;
         },
         error.AccessDenied
+        ,error.AlreadyBound
         ,error.Unexpected
         ,error.FileNotFound
+        ,error.FileDescriptorNotASocket
         ,error.NotDir
         ,error.ReadOnlyFileSystem
         ,error.SymLinkLoop
@@ -205,21 +213,25 @@ pub fn bind(sockfd: fd_t, addr: *const os.sockaddr, len: os.socklen_t) !void {
     };
 }
 
-pub fn listen(sockfd: fd_t, backlog: u32) !void {
+pub fn listen(sockfd: fd_t, backlog: u31) !void {
     os.listen(sockfd, backlog) catch |e| switch (e) {
         error.AddressInUse
+        ,error.NetworkSubsystemFailed
+        ,error.SystemResources
         => {
             log("WARNING: listen function error: {}", .{e});
             return error.Retry;
         },
         error.OperationNotSupported
+        ,error.AlreadyConnected
         ,error.FileDescriptorNotASocket
+        ,error.SocketNotBound
         ,error.Unexpected
         => panic("listen function failed with: {}", .{e}),
     };
 }
 
-pub fn makeListenSock(addr: *std.net.Address, backlog: u32) !fd_t {
+pub fn makeListenSock(addr: *std.net.Address, backlog: u31) !fd_t {
     const sockfd = try socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
     errdefer os.close(sockfd);
     try setsockopt(sockfd, os.SOL_SOCKET, os.SO_REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
@@ -231,6 +243,7 @@ pub fn makeListenSock(addr: *std.net.Address, backlog: u32) !fd_t {
 pub fn accept(sockfd: fd_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags: u32) !fd_t {
     return os.accept(sockfd, addr, addr_size, flags) catch |e| switch (e) {
         error.ConnectionAborted
+        ,error.ConnectionResetByPeer
         ,error.ProtocolFailure
         ,error.BlockedByFirewall
         ,error.WouldBlock
@@ -241,13 +254,16 @@ pub fn accept(sockfd: fd_t, addr: *os.sockaddr, addr_size: *os.socklen_t, flags:
         error.SystemResources
         ,error.ProcessFdQuotaExceeded
         ,error.SystemFdQuotaExceeded
+        ,error.NetworkSubsystemFailed
         => {
             log("WARNING: accept function error: {}", .{e});
             return error.Retry;
         },
         error.Unexpected
         ,error.PermissionDenied
+        ,error.FileDescriptorNotASocket
         ,error.SocketNotListening
+        ,error.OperationNotSupported
         => panic("accept function failed with: {}", .{e}),
     };
 }

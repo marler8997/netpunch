@@ -114,6 +114,7 @@ fn waitGenericTimeout(fd: fd_t, timeoutMillis: i32, events: i16) !bool {
     };
     const result = os.poll(&pollfds, timeoutMillis) catch |e| switch (e) {
         error.SystemResources
+        ,error.NetworkSubsystemFailed
         => {
             log("poll function failed with {}", .{e});
             return error.Retry;
