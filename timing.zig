@@ -7,7 +7,7 @@ const log = logging.log;
 pub fn SignModified(comptime T: type, comptime is_signed: bool) type {
     return switch (@typeInfo(T)) {
         .Int => |info| @Type(std.builtin.TypeInfo{.Int = .{
-            .is_signed = is_signed,
+            .signedness = .signed,
             .bits = info.bits,
         }}),
         else => @compileError("Signed requires an Int type but got: " ++ @typeName(T)),
