@@ -118,6 +118,7 @@ pub fn send(sockfd: socket_t, buf: []const u8, flags: u32) !void {
         ,error.FastOpenAlreadyInProgress // don't know what this is
         ,error.FileDescriptorNotASocket
         ,error.Unexpected
+        ,error.AddressFamilyNotSupported
         => panic("send function failed with: {}", .{e}),
     };
 }
@@ -261,7 +262,6 @@ pub fn accept(sockfd: socket_t, addr: *os.sockaddr, addr_size: *os.socklen_t, fl
             return error.Retry;
         },
         error.Unexpected
-        ,error.PermissionDenied
         ,error.FileDescriptorNotASocket
         ,error.SocketNotListening
         ,error.OperationNotSupported
