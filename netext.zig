@@ -78,6 +78,7 @@ pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !socket_t {
         ,error.OperationAborted
         ,error.HttpProxyDisconnectedDurringReply
         ,error.HttpProxyUnexpectedReply
+        ,error.NetworkSubsystemFailed
         => {
             log("WARNING: proxy connectHost returned error: {}", .{e});
             return error.Retry;
@@ -102,6 +103,8 @@ pub fn send(sockfd: socket_t, buf: []const u8, flags: u32) !void {
     common.sendfull(sockfd, buf, flags) catch |e| switch (e) {
         error.ConnectionResetByPeer
         ,error.BrokenPipe
+        ,error.NetworkUnreachable
+        ,error.NetworkSubsystemFailed
         => {
             log("send function error: {}", .{e});
             return error.Disconnected;
@@ -118,7 +121,6 @@ pub fn send(sockfd: socket_t, buf: []const u8, flags: u32) !void {
         ,error.FastOpenAlreadyInProgress // don't know what this is
         ,error.FileDescriptorNotASocket
         ,error.Unexpected
-        ,error.AddressFamilyNotSupported
         => panic("send function failed with: {}", .{e}),
     };
 }

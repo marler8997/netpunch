@@ -44,7 +44,7 @@ const global = struct {
 
 
 fn setupSignals() void {
-    global.ignoreSigaction.sigaction = os.SIG_IGN;
+    global.ignoreSigaction.handler.sigaction = os.SIG_IGN;
     std.mem.set(u32, &global.ignoreSigaction.mask, 0);
     global.ignoreSigaction.flags = 0;
     os.sigaction(os.SIGPIPE, &global.ignoreSigaction, null);
