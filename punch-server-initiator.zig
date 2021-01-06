@@ -315,7 +315,7 @@ fn dropClient(listenFd: fd_t, isPunch: bool) void {
         },
     };
     const kind : []const u8 = if (isPunch) "punch" else "raw";
-    log("got another {} client s={} from {}, closing it...", .{kind, fd, addr});
+    log("got another {s} client s={} from {}, closing it...", .{kind, fd, addr});
     common.shutdownclose(fd);
 }
 

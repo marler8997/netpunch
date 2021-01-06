@@ -59,7 +59,7 @@ pub fn main() anyerror!u8 {
             } else if (std.mem.eql(u8, arg, "-z")) {
                 portScan = true;
             } else {
-                std.debug.warn("Error: unknown command-line option '{}'\n", .{arg});
+                std.debug.warn("Error: unknown command-line option '{s}'\n", .{arg});
                 return 1;
             }
         }
@@ -98,7 +98,7 @@ pub fn main() anyerror!u8 {
             const portString = args[1];
             const port = common.parsePort(portString) catch return 1;
             const addr = Address.parseIp4(hostString, port) catch |e| {
-                std.debug.warn("Error: failed to parse '{}' as an IPv4 address: {}\n", .{hostString, e});
+                std.debug.warn("Error: failed to parse '{s}' as an IPv4 address: {}\n", .{hostString, e});
                 return 1;
             };
             std.debug.warn("[NC] connecting to {}...\n", .{addr});

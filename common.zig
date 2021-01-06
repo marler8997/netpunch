@@ -21,7 +21,7 @@ pub fn skipOver(comptime T: type, haystack: *T, needle: []const u8) bool {
 }
 
 pub fn delaySeconds(seconds: u32, msg: []const u8) void {
-    log("waiting {} seconds {}", .{seconds, msg});
+    log("waiting {} seconds {s}", .{seconds, msg});
     std.time.sleep(@intCast(u64, seconds) * std.time.ns_per_s);
 }
 
@@ -231,7 +231,7 @@ fn recvfullTimeoutHelper(sockfd: socket_t, buf: []u8, timeoutMillis: i32) !usize
 pub fn getOptArg(args: anytype, i: *usize) !@TypeOf(args[0]) {
     i.* += 1;
     if (i.* >= args.len) {
-        std.debug.warn("Error: option '{}' requires an argument\n", .{args[i.* - 1]});
+        std.debug.warn("Error: option '{s}' requires an argument\n", .{args[i.* - 1]});
         return error.CommandLineOptionMissingArgument;
     }
     return args[i.*];
@@ -240,14 +240,14 @@ pub fn getOptArg(args: anytype, i: *usize) !@TypeOf(args[0]) {
 /// logs an error if it fails
 pub fn parsePort(s: []const u8) !u16 {
     return std.fmt.parseInt(u16, s, 10) catch |e| {
-        log("Error: failed to parse '{}' as a port: {}", .{s, e});
+        log("Error: failed to parse '{s}' as a port: {}", .{s, e});
         return error.InvalidPortString;
     };
 }
 /// logs an error if it fails
 pub fn parseIp4(s: []const u8, port: u16) !Address {
     return Address.parseIp4(s, port) catch |e| {
-        log("Error: failed to parse '{}' as an IPv4 address: {}", .{s, e});
+        log("Error: failed to parse '{s}' as an IPv4 address: {}", .{s, e});
         return e;
     };
 }

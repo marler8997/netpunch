@@ -43,9 +43,23 @@ clean_scratch() {
 }
 clean_scratch
 
-###./zig-cache/bin/reverse-tunnel-client 127.0.0.1 > scratch/reverse-tunnel-client.log 2>&1 &
+bin=./debug/bin
+
+if [ -z "${START_PORT+x}" ]; then
+    start_port=9281
+else
+    start_port=$START_PORT
+fi
+
+port0=$start_port
+port1=$(expr $start_port + 1)
+port2=$(expr $start_port + 2)
+
+echo Using Ports: $port0 $port1 $port2
+
+###$bin/reverse-tunnel-client 127.0.0.1 > scratch/reverse-tunnel-client.log 2>&1 &
 ###reverse_tunnel_client_pid=$! ###
-###./zig-cache/bin/config-server > scratch/config-server1.log 2>&1 &
+###$bin/config-server > scratch/config-server1.log 2>&1 &
 ###config_server_pid=$!
 #### wait for server to start
 ###sleep 1
@@ -53,47 +67,49 @@ clean_scratch
 #### wait for server to exit
 ###sleep 1
 ###
-###./zig-cache/bin/config-server > scratch/config-server2.log 2>&1 &
+###$bin/config-server > scratch/config-server2.log 2>&1 &
 ###config_server_pid=$!
 #### wait for server to start
 ###sleep 1
 ###
 
 test_punch() {
+    echo "test_punch"
     clean_scratch
-    ./zig-cache/bin/punch-client-forwarder 127.0.0.1 9281 127.0.0.1 9287 > scratch/punch-client-forwarder.log 2>&1 &
+    $bin/punch-client-forwarder 127.0.0.1 $port0 127.0.0.1 $port2 > scratch/punch-client-forwarder.log 2>&1 &
     punch_client_forwarder_pid=$!
 
-    ./zig-cache/bin/punch-server-initiator 127.0.0.1 9281 127.0.0.1 9282 > scratch/punch-server-initiator.log 2>&1 &
+    $bin/punch-server-initiator 127.0.0.1 $port0 127.0.0.1 $port1 > scratch/punch-server-initiator.log 2>&1 &
     punch_server_initiator_pid=$!
 
-    ./zig-cache/bin/nc -l 9287 > scratch/inside-server.log 2>&1 &
+    $bin/nc -l $port2 > scratch/inside-server.log 2>&1 &
     inside_server_pid=$!
-    wait_for_port 127.0.0.1 9287
-    wait_for_port 127.0.0.1 9282
-    echo "hello from outside-client" | ./zig-cache/bin/nc 127.0.0.1 9282 > scratch/outside-client.log 2>&1
+    wait_for_port 127.0.0.1 $port2
+    wait_for_port 127.0.0.1 $port1
+    echo "hello from outside-client" | $bin/nc 127.0.0.1 $port1 > scratch/outside-client.log 2>&1
     wait_for_pid $inside_server_pid
     grep -q "hello from outside-client" scratch/inside-server.log
 }
 
 test_socat() {
+    echo "test_socat"
     clean_scratch
     for i in {1..5}; do
-        ./zig-cache/bin/socat tcp-listen:1280 tcp-listen:1281 > scratch/temp-socat-double-server-$i.log 2>&1 &
+        $bin/socat tcp-listen:1280 tcp-listen:1281 > scratch/temp-socat-double-server-$i.log 2>&1 &
         socat_double_server_pid=$!
         wait_for_port 127.0.0.1 1280
         # kill and restart to make sure immediate restart works
         kill -n 9 $socat_double_server_pid
     done
     # disable throttling so the test runs fast
-    ./zig-cache/bin/socat --no-throttle tcp-listen:1280 tcp-listen:1281 > scratch/socat-double-server-main.log 2>&1 &
+    $bin/socat --no-throttle tcp-listen:1280 tcp-listen:1281 > scratch/socat-double-server-main.log 2>&1 &
     socat_double_server_pid=$!
     wait_for_port 127.0.0.1 1280
     for i in {1..20}; do
         mkfifo scratch/nc-1280.fifo
-        cat scratch/nc-1280.fifo | ./zig-cache/bin/nc 127.0.0.1 1280 > scratch/nc-1280.log 2>&1 &
+        cat scratch/nc-1280.fifo | $bin/nc 127.0.0.1 1280 > scratch/nc-1280.log 2>&1 &
         wait_for_port 127.0.0.1 1281
-        ./zig-cache/bin/nc 127.0.0.1 1281 > scratch/nc-1281.log 2>&1 &
+        $bin/nc 127.0.0.1 1281 > scratch/nc-1281.log 2>&1 &
         nc_1281_pid=$!
         echo "what" > scratch/nc-1280.fifo
         wait_for_pid $nc_1281_pid
@@ -104,7 +120,7 @@ test_socat() {
 }
 
 
-#./zig-cache/bin/config-server > scratch/config-server1.log 2>&1 &
+#$bin/config-server > scratch/config-server1.log 2>&1 &
 #config_server_pid=$!
 ## wait for server to start
 #sleep 1
@@ -112,21 +128,21 @@ test_socat() {
 ## wait for server to exit
 #sleep 1
 
-#./zig-cache/bin/config-server > scratch/config-server2.log 2>&1 &
+#$bin/config-server > scratch/config-server2.log 2>&1 &
 #config_server_pid=$!
 ## wait for server to start
 #sleep 1
 
-#echo "" | ./zig-cache/bin/nc 127.0.0.1 9281 | hexdump -C
+#echo "" | $bin/nc 127.0.0.1 $port0 | hexdump -C
 
 #kill -n 9 $config_server_pid
 
-#./zig-cache/bin/double-server > scratch/double-server.log 2>&1 &
+#$bin/double-server > scratch/double-server.log 2>&1 &
 #double_server_pid=$!
 ## wait for server to start
 #sleep 1
 
-#echo "" | ./zig-cache/bin/nc 127.0.0.1 9282
+#echo "" | $bin/nc 127.0.0.1 $port1
 
 #echo "killing double-server pid=$double_server_pid..."
 #kill -n 9 $double_server_pid

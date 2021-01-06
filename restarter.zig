@@ -50,7 +50,7 @@ pub fn main() anyerror!u8 {
 fn printArgs(argv: []const []const u8) void {
     var prefix : []const u8 = "";
     for (argv) |arg| {
-        std.debug.warn("{}'{}'", .{prefix, arg});
+        std.debug.warn("{s}'{s}'", .{prefix, arg});
         prefix = " ";
     }
 }

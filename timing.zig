@@ -192,7 +192,7 @@ pub const Throttler = struct {
             const elapsedMillis = timestampDiff(nowMillis, self.checkinTimestamp);
             if (elapsedMillis < 0) {
                 if (self.logPrefix.len > 0)
-                    log("{}elapsed time is negative ({} ms), will wait {} ms...", .{self.logPrefix, elapsedMillis, self.desiredSleepMillis});
+                    log("{s}elapsed time is negative ({} ms), will wait {} ms...", .{self.logPrefix, elapsedMillis, self.desiredSleepMillis});
                 std.time.sleep(ns_per_ms * @intCast(u64, self.desiredSleepMillis));
                 self.sleepMillis = 0; // reset sleep time
             } else if (elapsedMillis >= self.desiredSleepMillis) {
@@ -204,13 +204,13 @@ pub const Throttler = struct {
                     self.sleepMillis = self.desiredSleepMillis - @intCast(Timestamp, workMillis);
                 }
                 if (self.logPrefix.len > 0)
-                    log("{}last operation took {} ms, no throttling needed (next sleep {} ms)...", .{self.logPrefix, workMillis, self.sleepMillis});
+                    log("{s}last operation took {} ms, no throttling needed (next sleep {} ms)...", .{self.logPrefix, workMillis, self.sleepMillis});
             } else {
                 const millisNeeded = self.desiredSleepMillis - @intCast(Timestamp, elapsedMillis);
                 const addMillis = if (millisNeeded < self.slowRateMillis) millisNeeded else self.slowRateMillis;
                 self.sleepMillis += addMillis;
                 if (self.logPrefix.len > 0)
-                    log("{}{} ms since last operation, will sleep {} ms...", .{self.logPrefix, elapsedMillis, self.sleepMillis});
+                    log("{s}{} ms since last operation, will sleep {} ms...", .{self.logPrefix, elapsedMillis, self.sleepMillis});
                 std.time.sleep(ns_per_ms * @intCast(u64, self.sleepMillis));
             }
         }

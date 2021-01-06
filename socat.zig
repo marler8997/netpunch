@@ -78,7 +78,7 @@ const Addr = union(enum) {
     pub fn parse(spec: []const u8) !Addr {
         var rest = spec;
         const specType = peelTo(&rest, ':') orelse {
-            std.debug.warn("Error: address '{}' missing ':' to delimit type\n", .{spec});
+            std.debug.warn("Error: address '{s}' missing ':' to delimit type\n", .{spec});
             return error.ParseAddrFailed;
         };
         if (mem.eql(u8, specType, "tcp-connect"))
@@ -88,7 +88,7 @@ const Addr = union(enum) {
         if (mem.eql(u8, specType, "tcp-listen"))
             return Addr { .TcpListen = try TcpListen.parse(rest) };
 
-        std.debug.warn("Error: unknown address-specifier type '{}'\n", .{specType});
+        std.debug.warn("Error: unknown address-specifier type '{s}'\n", .{specType});
         return error.ParseAddrFailed;
     }
     pub fn prepareConnect(self: *const Addr) !ConnectPrep {
@@ -170,7 +170,7 @@ const Addr = union(enum) {
         pub fn parse(spec: []const u8) !TcpConnect {
             var rest = spec;
             const host = peelTo(&rest, ':') orelse {
-                std.debug.warn("Error: 'tcp-connect:{}' missing ':' to delimit host\n", .{spec});
+                std.debug.warn("Error: 'tcp-connect:{s}' missing ':' to delimit host\n", .{spec});
                 return error.ParseAddrFailed;
             };
             const port = try common.parsePort(rest);
@@ -204,15 +204,15 @@ const Addr = union(enum) {
         pub fn parse(spec: []const u8) !ProxyConnect {
             var rest = spec;
             const proxyHost = peelTo(&rest, ':') orelse {
-                std.debug.warn("Error: 'proxy-connect:{}' missing ':' to delimit proxy-host\n", .{spec});
+                std.debug.warn("Error: 'proxy-connect:{s}' missing ':' to delimit proxy-host\n", .{spec});
                 return error.ParseAddrFailed;
             };
             const proxyPort = try common.parsePort(peelTo(&rest, ':') orelse {
-                std.debug.warn("Error: 'proxy-connect:{}' missing 2nd ':' to delimit proxy-port\n", .{spec});
+                std.debug.warn("Error: 'proxy-connect:{s}' missing 2nd ':' to delimit proxy-port\n", .{spec});
                 return error.ParseAddrFailed;
             });
             const targetHost = peelTo(&rest, ':') orelse {
-                std.debug.warn("Error: 'proxy-connect:{}' missing the 3rd ':' to delimit host\n", .{spec});
+                std.debug.warn("Error: 'proxy-connect:{s}' missing the 3rd ':' to delimit host\n", .{spec});
                 return error.ParseAddrFailed;
             };
             const targetPort = try common.parsePort(rest);
@@ -299,11 +299,13 @@ const Addr = union(enum) {
 const InOut = struct { in: socket_t, out: socket_t };
 
 fn usage() void {
-    std.debug.warn("Usage: socat ADDRESS1 ADDRESS2\n", .{});
-    std.debug.warn("Address Specifiers:\n", .{});
-    std.debug.warn("    tcp-connect:<host>:<port>\n", .{});
-    std.debug.warn("    tcp-listen:<port>[,<listen-addr>]\n", .{});
-    std.debug.warn("    proxy-connect:<proxy-host>:<proxy-port>:<host>:<port>\n", .{});
+    std.debug.warn(
+        \\Usage: socat ADDRESS1 ADDRESS2
+        \\Address Specifiers:
+        \\    tcp-connect:<host>:<port>
+        \\    tcp-listen:<port>[,<listen-addr>]
+        \\    proxy-connect:<proxy-host>:<proxy-port>:<host>:<port>
+    , .{});
 }
 
 pub fn main() anyerror!u8 {
@@ -331,7 +333,7 @@ pub fn main() anyerror!u8 {
             } else if (std.mem.eql(u8, arg, "--no-throttle")) {
                 noThrottle = true;
             } else {
-                std.debug.warn("Error: unknown command-line option '{}'\n", .{arg});
+                std.debug.warn("Error: unknown command-line option '{s}'\n", .{arg});
                 return 1;
             }
         }
@@ -369,12 +371,12 @@ fn sequenceConnectAddr1(addr1Prep: *const ConnectPrep) error { } {
     var connectThrottler = makeThrottler("addr1 connect: ");
     while (true) {
         connectThrottler.throttle();
-        log("connecting to {}...", .{global.addr1String});
+        log("connecting to {s}...", .{global.addr1String});
         const addr1InOut = global.addr1.connectSqueezeErrors(addr1Prep) catch |e| switch (e) {
             error.RetryConnect, error.Retry => continue,
         };
         defer global.addr1.disconnect(addr1InOut);
-        log("connected to {} (in={} out={})", .{global.addr1String, addr1InOut.in, addr1InOut.out});
+        log("connected to {s} (in={} out={})", .{global.addr1String, addr1InOut.in, addr1InOut.out});
         switch (sequencePrepareAddr2(addr1Prep, addr1InOut)) {
             error.Disconnect => continue,
         }
@@ -411,11 +413,11 @@ fn sequenceConnectAddr2(addr1Prep: *const ConnectPrep, addr1InOut: InOut, addr2P
             return error.Disconnect;
         }
         connectThrottler.throttle();
-        log("connecting to {}...", .{global.addr2String});
+        log("connecting to {s}...", .{global.addr2String});
         const addr2InOut = global.addr2.connectSqueezeErrors(addr2Prep) catch |e| switch (e) {
             error.Retry, error.RetryConnect => continue,
         };
-        log("connected to {} (in={} out={})", .{global.addr2String, addr2InOut.in, addr2InOut.out});
+        log("connected to {s} (in={} out={})", .{global.addr2String, addr2InOut.in, addr2InOut.out});
         defer global.addr2.disconnect(addr2InOut);
         switch (sequenceSetupEventing(addr1Prep, addr1InOut, addr2InOut, addr2Prep)) {
             error.Disconnect => return error.Disconnect,

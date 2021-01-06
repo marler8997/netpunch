@@ -74,7 +74,7 @@ pub fn main() anyerror!u8 {
     const rawForwardPort   = common.parsePort(args[3]) catch return 1;
 
     const punchHostAndProxy = proxy.parseProxy(punchConnectSpec) catch |e| {
-        log("Error: invalid connect specifier '{}': {}", .{punchConnectSpec, e});
+        log("Error: invalid connect specifier '{s}': {}", .{punchConnectSpec, e});
         return 1;
     };
 
@@ -100,7 +100,7 @@ fn makeThrottler(logPrefix: []const u8) timing.Throttler {
 fn sequenceConnectToPunchClient(punchHostAndProxy: *const HostAndProxy, punchPort: u16) error {
     PunchSocketDisconnect,
 } {
-    log("connecting to punch server {}{}:{}...", .{punchHostAndProxy.proxy, punchHostAndProxy.host, punchPort});
+    log("connecting to punch server {}{s}:{}...", .{punchHostAndProxy.proxy, punchHostAndProxy.host, punchPort});
     const punchFd = netext.proxyConnect(&punchHostAndProxy.proxy, punchHostAndProxy.host, punchPort) catch |e| switch (e) {
         error.Retry => return error.PunchSocketDisconnect,
     };

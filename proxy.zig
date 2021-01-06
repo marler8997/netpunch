@@ -58,7 +58,7 @@ pub const Proxy = union(enum) {
         switch (self) {
             .None => return,
             .Http => |http| {
-                try std.fmt.format(out_stream, "http://{}:{}/", .{http.host, http.port});
+                try std.fmt.format(out_stream, "http://{s}:{}/", .{http.host, http.port});
             },
         }
     }
@@ -76,7 +76,7 @@ pub fn sendHttpConnect(sockfd: socket_t, host: []const u8, port: u16) !void {
         + PART3.len;
     var requestBuffer : [MAX_CONNECT_REQUEST]u8 = undefined;
     const request = std.fmt.bufPrint(&requestBuffer,
-        PART1 ++ "{}:{}" ++ PART2 ++ "{}:{}" ++ PART3,
+        PART1 ++ "{s}:{}" ++ PART2 ++ "{s}:{}" ++ PART3,
         .{host, port, host, port}) catch |e| switch (e) {
         error.NoSpaceLeft
         => std.debug.panic("code bug: HTTP CONNECT requeset buffer {} not big enough", .{MAX_CONNECT_REQUEST}),
