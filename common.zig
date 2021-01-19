@@ -65,12 +65,15 @@ pub fn connect(sockfd: socket_t, addr: *const Address) os.ConnectError!void {
 }
 pub fn connectHost(host: []const u8, port: u16) !socket_t {
     // so far only ipv4 addresses supported
-    const addr = Address.parseIp4(host, port) catch
-        return error.DnsAndIPv6NotSupported;
-    const sockfd = try os.socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
-    errdefer os.close(sockfd);
-    try os.connect(sockfd, &addr.any, addr.getOsSockLen());
-    return sockfd;
+    if (Address.parseIp(host, port)) |addr| {
+        const sockfd = try os.socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
+        errdefer os.close(sockfd);
+        try os.connect(sockfd, &addr.any, addr.getOsSockLen());
+        return sockfd;
+    } else |_| {
+        // TODO: implement DNS
+        return error.DnsNotSupported;
+    }
 }
 
 const extern_windows = struct {

@@ -92,7 +92,7 @@ pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !socket_t {
         ,error.FileNotFound
         ,error.ProtocolFamilyNotAvailable
         ,error.ProtocolNotSupported
-        ,error.DnsAndIPv6NotSupported
+        ,error.DnsNotSupported
         ,error.IsDir
         ,error.FastOpenAlreadyInProgress // this is from sendto, EALREADY, not sure what it means
         ,error.SocketTypeNotSupported

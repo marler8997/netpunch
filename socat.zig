@@ -138,7 +138,7 @@ const Addr = union(enum) {
             ,error.ProtocolFamilyNotAvailable
             ,error.ProtocolNotSupported
             ,error.Unexpected
-            ,error.DnsAndIPv6NotSupported
+            ,error.DnsNotSupported
             => std.debug.panic("FATAL ERROR: connect failed with {}", .{e}),
         };
     }
