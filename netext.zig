@@ -43,6 +43,7 @@ pub fn connect(sockfd: socket_t, addr: *const Address) !void {
         ,error.AddressInUse
         ,error.ConnectionRefused
         ,error.ConnectionTimedOut
+        ,error.ConnectionResetByPeer
         ,error.NetworkUnreachable
         ,error.SystemResources
         ,error.WouldBlock
@@ -190,6 +191,7 @@ pub fn setsockopt(sockfd: socket_t, level: u32, optname: u32, opt: []const u8) !
         ,error.AlreadyConnected
         ,error.SocketNotBound
         ,error.Unexpected
+        ,error.PermissionDenied
         => panic("setsockopt function fatal with: {}", .{e}),
     };
 }

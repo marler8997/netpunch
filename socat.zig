@@ -121,6 +121,7 @@ const Addr = union(enum) {
             ,error.AddressNotAvailable
             ,error.SystemResources
             ,error.ConnectionRefused
+            ,error.ConnectionResetByPeer
             ,error.NetworkUnreachable
             ,error.PermissionDenied
             ,error.ConnectionTimedOut

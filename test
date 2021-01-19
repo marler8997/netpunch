@@ -43,7 +43,7 @@ clean_scratch() {
 }
 clean_scratch
 
-bin=./debug/bin
+bin=./zig-cache/bin
 
 if [ -z "${START_PORT+x}" ]; then
     start_port=9281
