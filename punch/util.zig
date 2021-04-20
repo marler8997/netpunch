@@ -48,7 +48,7 @@ pub fn doHandshake(punchFd: fd_t, myRole: proto.Role, recvTimeoutMillis: u32) !v
     }
     const magic = handshake[0..punch.proto.magic.len];
     if (!std.mem.eql(u8, magic, &punch.proto.magic)) {
-        log("got punch connection but received invalid magic value {x}", .{magic});
+        log("got punch connection but received invalid magic value {}", .{std.fmt.fmtSliceHexLower(magic)});
         return error.BadPunchHandshake;
     }
     const role = handshake[punch.proto.magic.len];
@@ -326,7 +326,7 @@ fn testParser(t: *const ParserTest, chunkLen: usize) !void {
                 switch (t.actions[expectedActionIndex]) {
                     .ForwardData => |expectedForward| {
                         const expected = expectedForward.data[expectedForwardDataOffset..];
-                        //std.debug.warn("[DEBUG] verifying {} bytes {x}\n", .{actualForward.data.len, actualForward.data});
+                        //std.debug.warn("[DEBUG] verifying {} bytes {x}\n", .{actualForward.data.len, std.fmt.fmtSliceHexLower(actualForward.data)});
                         std.debug.assert(std.mem.startsWith(u8, expected, actualForward.data));
                         expectedForwardDataOffset += actualForward.data.len;
                         if (expectedForwardDataOffset == expectedForward.data.len) {
