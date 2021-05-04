@@ -47,6 +47,7 @@ pub fn connect(sockfd: socket_t, addr: *const Address) !void {
         ,error.NetworkUnreachable
         ,error.SystemResources
         ,error.WouldBlock
+        ,error.ConnectionPending
         => {
             log("WARNING: connect function returned error: {}", .{e});
             return error.Retry;
@@ -80,6 +81,7 @@ pub fn proxyConnect(prox: *const Proxy, host: []const u8, port: u16) !socket_t {
         ,error.HttpProxyDisconnectedDurringReply
         ,error.HttpProxyUnexpectedReply
         ,error.NetworkSubsystemFailed
+        ,error.ConnectionPending
         => {
             log("WARNING: proxy connectHost returned error: {}", .{e});
             return error.Retry;

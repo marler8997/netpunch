@@ -7,7 +7,7 @@ const logging = @import("./logging.zig");
 const common = @import("./common.zig");
 const netext = @import("./netext.zig");
 const timing = @import("./timing.zig");
-const eventing = @import("./eventing.zig");
+const eventing = @import("./eventing.zig").default;
 const punch = @import("./punch.zig");
 const proxy = @import("./proxy.zig");
 
@@ -22,17 +22,20 @@ const PunchRecvState = punch.util.PunchRecvState;
 const Proxy = proxy.Proxy;
 const HostAndProxy = proxy.HostAndProxy;
 
-const EventError = error {
-    PunchSocketDisconnect,
-    RawSocketDisconnect,
-};
-const Eventer = eventing.EventerTemplate(EventError, struct {
-    punchFd: fd_t,
-    rawFd: fd_t,
-    punchRecvState: *PunchRecvState,
-    gotCloseTunnel: *bool,
-}, struct {
-    fd: fd_t,
+const Eventer = eventing.EventerTemplate(.{
+    .Data = struct {
+        punchFd: fd_t,
+        rawFd: fd_t,
+        punchRecvState: *PunchRecvState,
+        gotCloseTunnel: *bool,
+    },
+    .CallbackError = error {
+        PunchSocketDisconnect,
+        RawSocketDisconnect,
+    },
+    .CallbackData = struct {
+        fd: fd_t,
+    },
 });
 
 const global = struct {
@@ -198,7 +201,7 @@ fn sequenceForwardingLoop(punchFd: fd_t, heartbeatTimer: *Timer, punchRecvState:
     PunchSocketDisconnect,
     RawSocketDisconnect,
 } {
-    var eventer = common.eventerInit(Eventer, Eventer.EventerDataAlias {
+    var eventer = common.eventerInit(Eventer, Eventer.Data {
         .punchFd = punchFd,
         .rawFd = rawFd,
         .punchRecvState = punchRecvState,
@@ -238,7 +241,7 @@ fn sequenceForwardingLoop(punchFd: fd_t, heartbeatTimer: *Timer, punchRecvState:
     }
 }
 
-fn onRawData(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
+fn onRawData(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
     std.debug.assert(callback.data.fd == eventer.data.rawFd);
     punch.util.forwardRawToPunch(callback.data.fd, eventer.data.punchFd, &global.buffer) catch |e| switch (e) {
         error.RawSocketDisconnect => return error.RawSocketDisconnect,
@@ -246,7 +249,7 @@ fn onRawData(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
     };
 }
 
-fn onPunchData(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
+fn onPunchData(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
     const len = netext.read(callback.data.fd, &global.buffer) catch |e| switch (e) {
         error.Retry => {
             delaySeconds(1, "before trying to read punch socket again...");

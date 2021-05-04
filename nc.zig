@@ -11,12 +11,12 @@ const os = std.os;
 const net = std.net;
 
 const common = @import("./common.zig");
-const eventing = @import("./eventing.zig");
+const eventing = @import("./eventing.zig").default;
 
 const fd_t = os.fd_t;
 const Address = net.Address;
 const EventFlags = eventing.EventFlags;
-const Eventer = eventing.EventerTemplate(anyerror, struct {}, struct {});
+const Eventer = eventing.EventerTemplate(.{});
 
 const global = struct {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);

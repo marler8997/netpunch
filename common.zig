@@ -272,7 +272,7 @@ pub fn eventerAdd(comptime Eventer: type, eventer: *Eventer, fd: Eventer.Fd, fla
     };
 }
 
-pub fn eventerInit(comptime Eventer: type, data: Eventer.EventerDataAlias) !Eventer {
+pub fn eventerInit(comptime Eventer: type, data: Eventer.Data) !Eventer {
     return Eventer.init(data) catch |e| switch (e) {
         error.ProcessFdQuotaExceeded
         ,error.SystemFdQuotaExceeded

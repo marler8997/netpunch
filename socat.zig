@@ -13,7 +13,7 @@ const net = std.net;
 const common = @import("./common.zig");
 const logging = @import("./logging.zig");
 const timing = @import("./timing.zig");
-const eventing = @import("./eventing.zig");
+const eventing = @import("./eventing.zig").default;
 const netext = @import("./netext.zig");
 const proxy = @import("./proxy.zig");
 
@@ -22,9 +22,11 @@ const socket_t = os.socket_t;
 const Address = net.Address;
 const log = logging.log;
 const EventFlags = eventing.EventFlags;
-const EventError = error { Disconnect };
-const Eventer = eventing.EventerTemplate(EventError, struct {}, struct {
-    inOut: InOut,
+const Eventer = eventing.EventerTemplate(.{
+    .CallbackError = error { Disconnect },
+    .CallbackData = struct {
+        inOut: InOut,
+    },
 });
 const Proxy = proxy.Proxy;
 
@@ -129,6 +131,7 @@ const Addr = union(enum) {
             ,error.FileNotFound
             ,error.ProcessFdQuotaExceeded
             ,error.SystemFdQuotaExceeded
+            ,error.ConnectionPending
             => {
                 log("connect failed with {}", .{e});
                 return error.Retry;
@@ -475,14 +478,14 @@ fn sequenceForwardLoop(addr1Prep: *const ConnectPrep, addr1InOut: InOut, addr2In
     }
 }
 
-fn onAddr1Read(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
+fn onAddr1Read(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
     return onRead(true, callback);
 }
-fn onAddr2Read(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
+fn onAddr2Read(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
     return try onRead(false, callback);
 }
 
-fn onRead(isAddr1Read: bool, callback: *Eventer.Callback) EventError!void {
+fn onRead(isAddr1Read: bool, callback: *Eventer.Callback) Eventer.CallbackError!void {
     // TODO: I should use the sendfile syscall if available
     const length = os.read(callback.data.inOut.in, &global.buffer) catch |e| {
         log("read failed: {}", .{e});
@@ -498,7 +501,7 @@ fn onRead(isAddr1Read: bool, callback: *Eventer.Callback) EventError!void {
     //log("[VERBOSE] {} {} bytes", .{dirString, length});
 }
 
-fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) EventError!void {
+fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
     var addr : Address = undefined;
     var addrLen : os.socklen_t = @sizeOf(Address);
     const fd = netext.accept(callback.data.inOut.in, &addr.any, &addrLen, 0) catch |e| switch (e) {

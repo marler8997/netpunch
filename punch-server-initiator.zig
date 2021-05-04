@@ -13,7 +13,7 @@ const logging = @import("./logging.zig");
 const common = @import("./common.zig");
 const netext = @import("./netext.zig");
 const timing = @import("./timing.zig");
-const eventing = @import("./eventing.zig");
+const eventing = @import("./eventing.zig").default;
 const punch = @import("./punch.zig");
 
 const fd_t = os.fd_t;
@@ -24,22 +24,28 @@ const Timer = timing.Timer;
 const EventFlags = eventing.EventFlags;
 const PunchRecvState = punch.util.PunchRecvState;
 
-const AcceptRawEventError = error {PunchSocketDisconnect};
-const AcceptRawEventer = eventing.EventerTemplate(AcceptRawEventError, struct {
-    punchRecvState: *PunchRecvState,
-    acceptedRawClient: fd_t,
-}, struct {
-    fd: fd_t,
+const AcceptRawEventer = eventing.EventerTemplate(.{
+    .Data = struct {
+        punchRecvState: *PunchRecvState,
+        acceptedRawClient: fd_t,
+    },
+    .CallbackError = error { PunchSocketDisconnect },
+    .CallbackData = struct {
+        fd: fd_t,
+    },
 });
 
-const ForwardingEventError = error {PunchSocketDisconnect, RawSocketDisconnect};
-const ForwardingEventer = eventing.EventerTemplate(ForwardingEventError, struct {
-    punchRecvState: *PunchRecvState,
-    punchFd: fd_t,
-    rawFd: fd_t,
-    gotCloseTunnel: *bool,
-}, struct {
-    fd: fd_t,
+const ForwardingEventer = eventing.EventerTemplate(.{
+    .Data = struct {
+        punchRecvState: *PunchRecvState,
+        punchFd: fd_t,
+        rawFd: fd_t,
+        gotCloseTunnel: *bool,
+    },
+    .CallbackError = error {PunchSocketDisconnect, RawSocketDisconnect},
+    .CallbackData = struct {
+        fd: fd_t,
+    },
 });
 
 const global = struct {
@@ -295,13 +301,13 @@ fn sequenceForwardingLoop(epollfd: fd_t, punchListenFd: fd_t, punchFd: fd_t, hea
     }
 }
 
-fn onPunchAcceptAcceptRaw(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventError!void {
+fn onPunchAcceptAcceptRaw(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventer.CallbackError!void {
     dropClient(callback.data.fd, true);
 }
-fn onPunchAcceptForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventError!void {
+fn onPunchAcceptForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventer.CallbackError!void {
     dropClient(callback.data.fd, true);
 }
-fn onRawAcceptForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventError!void {
+fn onRawAcceptForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventer.CallbackError!void {
     dropClient(callback.data.fd, false);
 }
 fn dropClient(listenFd: fd_t, isPunch: bool) void {
@@ -319,7 +325,7 @@ fn dropClient(listenFd: fd_t, isPunch: bool) void {
     common.shutdownclose(fd);
 }
 
-fn onFirstRawAccept(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventError!void {
+fn onFirstRawAccept(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventer.CallbackError!void {
     std.debug.assert(eventer.data.acceptedRawClient == -1);
 
     var addr : Address = undefined;
@@ -336,20 +342,20 @@ fn onFirstRawAccept(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Call
     eventer.data.acceptedRawClient = rawFd; // signals the eventer loop that we have accept a raw client
 }
 
-fn onRawData(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventError!void {
+fn onRawData(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventer.CallbackError!void {
     punch.util.forwardRawToPunch(callback.data.fd, eventer.data.punchFd, &global.buffer) catch |e| switch (e) {
         error.RawSocketDisconnect => return error.RawSocketDisconnect,
         error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
     };
 }
 
-fn onPunchDataAcceptRaw(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventError!void {
+fn onPunchDataAcceptRaw(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventer.CallbackError!void {
     var gotCloseTunnel = false;
     onPunchData(AcceptRawEventer, eventer, callback.data.fd) catch |e| switch (e) {
         error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
     };
 }
-fn onPunchDataForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventError!void {
+fn onPunchDataForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventer.CallbackError!void {
     onPunchData(ForwardingEventer, eventer, callback.data.fd) catch |e| switch (e) {
         error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
         error.RawSocketDisconnect => return error.RawSocketDisconnect,

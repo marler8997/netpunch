@@ -4,12 +4,12 @@ const os = std.os;
 const net = std.net;
 
 const common = @import("./common.zig");
-const eventing = @import("./eventing.zig");
+const eventing = @import("./eventing.zig").default;
 
 const fd_t = os.fd_t;
 const Address = net.Address;
 const EventFlags = eventing.EventFlags;
-const Eventer = eventing.EventerTemplate(anyerror, struct {}, struct {});
+const Eventer = eventing.EventerTemplate(.{});
 
 const INVALID_FD = if(std.builtin.os.tag == .windows) std.os.windows.ws2_32.INVALID_SOCKET
     else -1;

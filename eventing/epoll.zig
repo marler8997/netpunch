@@ -5,6 +5,9 @@ const timing = @import("./timing.zig");
 const logging = @import("../logging.zig");
 const common = @import("./common.zig");
 
+const eventing = @import("../eventing.zig");
+const EventerOptions = eventing.EventerOptions;
+
 const fd_t = os.fd_t;
 const log = logging.log;
 
@@ -14,14 +17,14 @@ pub const EventFlags = struct {
     pub const hangup = os.EPOLLRDHUP;
 };
 
-pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, comptime CallbackData: type) type {
+pub fn EventerTemplate(comptime options: EventerOptions) type {
     return struct {
         pub const Fd = fd_t;
-        pub const EventerErrorAlias = EventerError;
-        pub const EventerDataAlias = EventerData;
+        pub const Data = options.Data;
+        pub const CallbackError = options.CallbackError;
         pub const Callback = struct {
             func: CallbackFn,
-            data: CallbackData,
+            data: options.CallbackData,
             pub fn init(func: CallbackFn, data: CallbackData) @This() {
                 return @This() {
                     .func = func,
@@ -29,16 +32,16 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
                 };
             }
         };
-        pub const CallbackFn = fn(server: *@This(), callback: *Callback) EventError!void;
+        pub const CallbackFn = fn(server: *@This(), callback: *Callback) CallbackError!void;
 
         /// data that can be shared between all callbacks
-        data: EventerData,
+        data: Data,
         epollfd: fd_t,
         ownEpollFd: bool,
-        pub fn init(data: EventerData) !@This() {
+        pub fn init(data: Data) !@This() {
             return @This().initEpoll(data, try os.epoll_create1(0), true);
         }
-        pub fn initEpoll(data: EventerData, epollfd: fd_t, ownEpollFd: bool) @This() {
+        pub fn initEpoll(data: Data, epollfd: fd_t, ownEpollFd: bool) @This() {
             return @This() {
                 .data = data,
                 .epollfd = epollfd,
@@ -80,7 +83,7 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
         }
 
         // returns: false if there was a timeout
-        fn handleEventsGeneric(self: *@This(), timeoutMillis: i32) EventError!bool {
+        fn handleEventsGeneric(self: *@This(), timeoutMillis: i32) CallbackError!bool {
             // get 1 event at a time to prevent stale events
             var events : [1]os.epoll_event = undefined;
             const count = os.epoll_wait(self.epollfd, &events, timeoutMillis);
@@ -102,17 +105,17 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
             }
             return true; // was not a timeout
         }
-        pub fn handleEvents(self: *@This(), timeoutMillis: u32) EventError!bool {
+        pub fn handleEvents(self: *@This(), timeoutMillis: u32) CallbackError!bool {
             return self.handleEventsGeneric(@intCast(i32, timeoutMillis));
         }
 
-        pub fn handleEventsNoTimeout(self: *@This()) EventError!void {
+        pub fn handleEventsNoTimeout(self: *@This()) CallbackError!void {
             if (!try self.handleEventsGeneric(-1))
                 std.debug.panic("epoll returned 0 with ifinite timeout?", .{});
         }
         // a convenient helper method, might remove this
-        // TODO: should only return EventError, not EventError!void
-        pub fn loop(self: *@This()) EventError!void {
+        // TODO: should only return CallbackError, not CallbackError!void
+        pub fn loop(self: *@This()) CallbackError!void {
             while (true) {
                 try self.handleEventsNoTimeout();
             }
