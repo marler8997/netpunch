@@ -4,7 +4,7 @@
 #
 # * connect punch-client-forwarder to a server that doesn't respond like a web server
 #
-#       ./zig-cache/bin/punch-client-forwarder 127.0.0.1 80 127.0.0.1 1234
+#       ./zig-out/bin/punch-client-forwarder 127.0.0.1 80 127.0.0.1 1234
 #
 #   make sure it keeps reconnecting waiting for magic value
 #
@@ -43,7 +43,7 @@ clean_scratch() {
 }
 clean_scratch
 
-bin=./zig-cache/bin
+bin=./zig-out/bin
 
 if [ -z "${START_PORT+x}" ]; then
     start_port=9281
