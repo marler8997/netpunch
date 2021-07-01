@@ -302,12 +302,15 @@ fn sequenceForwardingLoop(epollfd: fd_t, punchListenFd: fd_t, punchFd: fd_t, hea
 }
 
 fn onPunchAcceptAcceptRaw(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventer.CallbackError!void {
+    _ = eventer;
     dropClient(callback.data.fd, true);
 }
 fn onPunchAcceptForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventer.CallbackError!void {
+    _ = eventer;
     dropClient(callback.data.fd, true);
 }
 fn onRawAcceptForwarding(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback) ForwardingEventer.CallbackError!void {
+    _ = eventer;
     dropClient(callback.data.fd, false);
 }
 fn dropClient(listenFd: fd_t, isPunch: bool) void {
@@ -350,7 +353,6 @@ fn onRawData(eventer: *ForwardingEventer, callback: *ForwardingEventer.Callback)
 }
 
 fn onPunchDataAcceptRaw(eventer: *AcceptRawEventer, callback: *AcceptRawEventer.Callback) AcceptRawEventer.CallbackError!void {
-    var gotCloseTunnel = false;
     onPunchData(AcceptRawEventer, eventer, callback.data.fd) catch |e| switch (e) {
         error.PunchSocketDisconnect => return error.PunchSocketDisconnect,
     };

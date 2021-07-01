@@ -1,7 +1,6 @@
 const std = @import("std");
 const os = std.os;
 
-const timing = @import("./timing.zig");
 const logging = @import("../logging.zig");
 const common = @import("./common.zig");
 

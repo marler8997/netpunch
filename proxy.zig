@@ -55,6 +55,8 @@ pub const Proxy = union(enum) {
         options: std.fmt.FormatOptions,
         out_stream: anytype,
     ) !void {
+        _ = fmt;
+        _ = options;
         switch (self) {
             .None => return,
             .Http => |http| {
@@ -89,6 +91,7 @@ const HttpEndResponse = "\r\n\r\n";
 pub fn receiveHttpOk(sockfd: fd_t, readTimeoutMillis: i32) !void {
     // TODO: I must implement a reasonable timeout
     //       to prevent waiting forever if I never get \r\n\r\n
+    _ = readTimeoutMillis;
     const State = union(enum) {
         Reading200: u8,
         ReadingToEnd: u8,

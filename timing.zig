@@ -4,17 +4,17 @@ const logging = @import("./logging.zig");
 const log = logging.log;
 
 /// TODO: these functions should go somewhere else
-pub fn SignModified(comptime T: type, comptime is_signed: bool) type {
+pub fn SignModified(comptime T: type, comptime signedness: std.builtin.Signedness) type {
     return switch (@typeInfo(T)) {
         .Int => |info| @Type(std.builtin.TypeInfo{.Int = .{
-            .signedness = .signed,
+            .signedness = signedness,
             .bits = info.bits,
         }}),
         else => @compileError("Signed requires an Int type but got: " ++ @typeName(T)),
     };
 }
-pub fn Signed  (comptime T: type) type { return SignModified(T, true ); }
-pub fn Unsigned(comptime T: type) type { return SignModified(T, false); }
+pub fn Signed  (comptime T: type) type { return SignModified(T, .signed ); }
+pub fn Unsigned(comptime T: type) type { return SignModified(T, .unsigned); }
 
 pub const Timestamp = @typeInfo(@TypeOf(std.time.milliTimestamp)).Fn.return_type.?;
 pub const TimestampDiff = Signed(Timestamp);
@@ -124,7 +124,7 @@ pub fn TimersTemplate(comptime CallbackData: type) type {
             return @This() { .optionalNext = null };
         }
         pub fn add(self: *@This(), callback: *Callback) !void {
-            if (self.optionalNext) |next| {
+            if (self.optionalNext) |_| {
                 std.debug.assert(false);
             } else {
                 self.optionalNext = callback;

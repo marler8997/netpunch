@@ -132,6 +132,7 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
         }
 
         pub fn loop(self: *@This()) anyerror!void {
+            _ = self;
             std.debug.panic("not implemented", .{});
             //while (true) {
             //    readSet: fd_set(64), // just hardcode to 64 for now

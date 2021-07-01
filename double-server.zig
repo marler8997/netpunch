@@ -59,6 +59,7 @@ pub fn main() anyerror!u8 {
 }
 
 fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
+    _ = callback;
     var addr : Address = undefined;
     var addrlen : os.socklen_t = @sizeOf(@TypeOf(addr));
 

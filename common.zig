@@ -147,14 +147,22 @@ pub fn sendfull(sockfd: socket_t, buf: []const u8, flags: u32) !void {
         totalSent += lastSent;
     }
 }
-pub fn writeFull(fd: fd_t, buf: []const u8) !void {
-    var totalSent : usize = 0;
-    while (totalSent < buf.len) {
-        const lastSent = try os.write(fd, buf[totalSent..]);
-        if (lastSent == 0)
-            return error.WriteReturnedZero;
-        totalSent += lastSent;
+
+const WriteAllError = error { FdClosed } || std.os.WriteError;
+const WriteAllErrorResult = struct {
+    err: WriteAllError,
+    wrote: usize,
+};
+pub fn tryWriteAll(fd: fd_t, buf: []const u8) ?WriteAllErrorResult {
+    var total_wrote : usize = 0;
+    while (total_wrote < buf.len) {
+        const last_wrote = os.write(fd, buf[total_wrote..]) catch |e|
+            return WriteAllErrorResult { .err = e, .wrote = total_wrote };
+        if (last_wrote == 0)
+            return WriteAllErrorResult { .err = error.FdClosed, .wrote = total_wrote };
+        total_wrote += last_wrote;
     }
+    return null;
 }
 
 fn waitGenericTimeout(fd: fd_t, timeoutMillis: i32, events: i16) !bool {
@@ -189,16 +197,6 @@ pub fn waitWriteableTimeout(fd: fd_t, timeoutMillis: i32) !bool {
     return waitGenericTimeout(fd, timeoutMillis, os.POLLOUT);
 }
 
-pub fn recvfull(sockfd: socket_t, buf: []u8) !void {
-    var totalReceived : usize = 0;
-    while (totalReceived < buf.len) {
-        const lastReceived = try os.read(sockfd, buf[totalSent..]);
-        //if (lastReceived == 0)
-        //    return error.SendReturnedZero;
-        //totalSent += lastSent;
-        return error.NotImplemented;
-    }
-}
 pub fn recvfullTimeout(sockfd: socket_t, buf: []u8, timeoutMillis: u32) !bool {
     var newTimeoutMillis = timeoutMillis;
     var totalReceived : usize = 0;

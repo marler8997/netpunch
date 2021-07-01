@@ -184,21 +184,31 @@ const Addr = union(enum) {
             };
         }
         pub fn prepareConnect(self: *const TcpConnect) !ConnectPrep {
+            _ = self;
             return ConnectPrep.None;
         }
         pub fn unprepareConnect(self: *const TcpConnect, prep: *const ConnectPrep) void {
+            _ = self;
+            _ = prep;
         }
         pub fn connect(self: *const TcpConnect, prep: *const ConnectPrep) !InOut {
+            _ = prep;
             const sockfd = try common.connectHost(self.host, self.port);
             return InOut { .in = sockfd, .out = sockfd };
         }
         pub fn disconnect(self: *const TcpConnect, inOut: InOut) void {
+            _ = self;
             std.debug.assert(inOut.in == inOut.out);
             common.shutdownclose(inOut.in);
         }
         pub fn eventerAdd(self: *const TcpConnect, prep: *const ConnectPrep, callback: *Eventer.Callback) !void {
+            _ = self;
+            _ = prep;
+            _ = callback;
         }
         pub fn eventerRemove(self: *const TcpConnect, prep: *const ConnectPrep) void {
+            _ = self;
+            _ = prep;
         }
     };
     pub const ProxyConnect = struct {
@@ -227,21 +237,31 @@ const Addr = union(enum) {
             };
         }
         pub fn prepareConnect(self: *const ProxyConnect) !ConnectPrep {
+            _ = self;
             return ConnectPrep.None;
         }
         pub fn unprepareConnect(self: *const ProxyConnect, prep: *const ConnectPrep) void {
+            _ = self;
+            _ = prep;
         }
         pub fn connect(self: *const ProxyConnect, prep: *const ConnectPrep) !InOut {
+            _ = prep;
             const sockfd = try netext.proxyConnect(&self.httpProxy, self.targetHost, self.targetPort);
             return InOut { .in = sockfd, .out = sockfd };
         }
         pub fn disconnect(self: *const ProxyConnect, inOut: InOut) void {
+            _ = self;
             std.debug.assert(inOut.in == inOut.out);
             common.shutdownclose(inOut.in);
         }
         pub fn eventerAdd(self: *const ProxyConnect, prep: *const ConnectPrep, callback: *Eventer.Callback) !void {
+            _ = self;
+            _ = prep;
+            _ = callback;
         }
         pub fn eventerRemove(self: *const ProxyConnect, prep: *const ConnectPrep) void {
+            _ = self;
+            _ = prep;
         }
     };
     pub const TcpListen = struct {
@@ -268,9 +288,11 @@ const Addr = union(enum) {
             };
         }
         pub fn unprepareConnect(self: *const TcpListen, prep: *const ConnectPrep) void {
+            _ = self;
             os.close(getListenFd(prep));
         }
         pub fn connect(self: *const TcpListen, prep: *const ConnectPrep) !InOut {
+            _ = self;
             const listenFd = getListenFd(prep);
             var clientAddr : Address = undefined;
             var clientAddrLen : os.socklen_t = @sizeOf(@TypeOf(clientAddr));
@@ -281,10 +303,12 @@ const Addr = union(enum) {
             return InOut { .in = clientFd, .out = clientFd };
         }
         pub fn disconnect(self: *const TcpListen, inOut: InOut) void {
+            _ = self;
             std.debug.assert(inOut.in == inOut.out);
             common.shutdownclose(inOut.in);
         }
         pub fn eventerAdd(self: *const TcpListen, prep: *const ConnectPrep, callback: *Eventer.Callback) !void {
+            _ = self;
             const listenFd = getListenFd(prep);
             callback.* = Eventer.Callback {
                 .func = onAccept,
@@ -295,6 +319,7 @@ const Addr = union(enum) {
             };
         }
         pub fn eventerRemove(self: *const TcpListen, prep: *const ConnectPrep) void {
+            _ = self;
             global.eventer.remove(getListenFd(prep));
         }
     };
@@ -479,9 +504,11 @@ fn sequenceForwardLoop(addr1Prep: *const ConnectPrep, addr1InOut: InOut, addr2In
 }
 
 fn onAddr1Read(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
+    _ = eventer;
     return onRead(true, callback);
 }
 fn onAddr2Read(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
+    _ = eventer;
     return try onRead(false, callback);
 }
 
@@ -495,13 +522,17 @@ fn onRead(isAddr1Read: bool, callback: *Eventer.Callback) Eventer.CallbackError!
         log("read fd={} returned 0", .{callback.data.inOut.in});
         return error.Disconnect;
     }
-    common.writeFull(callback.data.inOut.out, global.buffer[0..length]) catch |e| {
-    };
-    const dirString : []const u8 = if (isAddr1Read) ">>>" else "<<<";
+    if (common.tryWriteAll(callback.data.inOut.out, global.buffer[0..length])) |result| {
+        log("write fd={} len={} failed with {}, wrote {}", .{callback.data.inOut.out, length, result.err, result.wrote});
+        return error.Disconnect;
+    }
+    _ = isAddr1Read;
+    //const dirString : []const u8 = if (isAddr1Read) ">>>" else "<<<";
     //log("[VERBOSE] {} {} bytes", .{dirString, length});
 }
 
 fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) Eventer.CallbackError!void {
+    _ = eventer;
     var addr : Address = undefined;
     var addrLen : os.socklen_t = @sizeOf(Address);
     const fd = netext.accept(callback.data.inOut.in, &addr.any, &addrLen, 0) catch |e| switch (e) {

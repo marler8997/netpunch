@@ -143,6 +143,8 @@ fn sockDisconnected() noreturn {
 }
 
 fn onSockData(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
+    _ = eventer;
+    _ = callback;
     // TODO: I should use the sendfile syscall if available
     const length = os.read(global.sockfd, &global.buffer) catch |e| {
         std.debug.warn("[NC] s={} read failed: {}\n", .{global.sockfd, e});
@@ -152,7 +154,10 @@ fn onSockData(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
         std.debug.warn("[NC] s={} disconnected\n", .{global.sockfd});
         sockDisconnected();
     }
-    try common.writeFull(global.stdout, global.buffer[0..length]);
+    if (common.tryWriteAll(global.stdout, global.buffer[0..length])) |result| {
+        std.debug.warn("[NC] s={} write failed with {}, wrote {} bytes out of {}", .{global.sockfd, result.err, result.wrote, length});
+        return error.StdoutClosed;
+    }
 }
 
 fn stdinClosed(eventer: *Eventer) !void {
@@ -162,6 +167,7 @@ fn stdinClosed(eventer: *Eventer) !void {
 }
 
 fn onStdinData(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
+    _ = callback;
     // TODO: I should use the sendfile syscall if available
     const length = os.read(global.stdin, &global.buffer) catch |e| {
         std.debug.warn("[NC] stdin read failed: {}\n", .{e});
