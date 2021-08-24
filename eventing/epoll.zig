@@ -88,11 +88,11 @@ pub fn EventerTemplate(comptime options: EventerOptions) type {
             const count = os.epoll_wait(self.epollfd, &events, timeoutMillis);
             const errno = os.errno(count);
             switch (errno) {
-                0 => {},
-                os.EBADF
-                ,os.EFAULT
-                ,os.EINTR
-                ,os.EINVAL
+                .SUCCESS => {},
+                .BADF
+                ,.FAULT
+                ,.INTR
+                ,.INVAL
                 => std.debug.panic("epoll_wait failed with {}", .{errno}),
                 else => std.debug.panic("epoll_wait failed with {}", .{errno}),
             }

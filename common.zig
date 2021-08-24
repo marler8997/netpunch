@@ -51,11 +51,11 @@ pub fn getsockerror(sockfd: socket_t) !c_int {
     var resultLen : os.socklen_t = @sizeOf(c_int);
     switch (os.errno(os.linux.getsockopt(sockfd, os.SOL_SOCKET, os.SO_ERROR, @ptrCast([*]u8, &errorCode), &resultLen))) {
         0 => return errorCode,
-        os.EBADF => unreachable,
-        os.EFAULT => unreachable,
-        os.EINVAL => unreachable,
-        os.ENOPROTOOPT => unreachable,
-        os.ENOTSOCK => unreachable,
+        .EBADF => unreachable,
+        .EFAULT => unreachable,
+        .EINVAL => unreachable,
+        .ENOPROTOOPT => unreachable,
+        .ENOTSOCK => unreachable,
         else => |err| return os.unexpectedErrno(err),
     }
 }
@@ -123,12 +123,12 @@ pub fn shutdown(sockfd: socket_t) ShutdownError!void {
             else => |err| return std.os.windows.unexpectedWSAError(err),
         };
     } else switch (os.errno(os.linux.shutdown(sockfd, os.SHUT_RDWR))) {
-        0 => return,
-        os.EBADF => unreachable,
-        os.EINVAL => return error.InvalidShutdownHow,
-        os.ENOTCONN => return error.SocketNotConnected,
-        os.ENOTSOCK => return error.FileDescriptorNotASocket,
-        os.ENOBUFS => return error.SystemResources,
+        .SUCCESS => return,
+        .BADF => unreachable,
+        .INVAL => return error.InvalidShutdownHow,
+        .NOTCONN => return error.SocketNotConnected,
+        .NOTSOCK => return error.FileDescriptorNotASocket,
+        .NOBUFS => return error.SystemResources,
         else => |err| return os.unexpectedErrno(err),
     }
 }
