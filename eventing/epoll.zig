@@ -11,9 +11,9 @@ const fd_t = os.fd_t;
 const log = logging.log;
 
 pub const EventFlags = struct {
-    pub const read = os.EPOLLIN;
-    pub const write = os.EPOLLOUT;
-    pub const hangup = os.EPOLLRDHUP;
+    pub const read = os.linux.EPOLL.IN;
+    pub const write = os.linux.EPOLL.OUT;
+    pub const hangup = os.linux.EPOLL.RDHUP;
 };
 
 pub fn EventerTemplate(comptime options: EventerOptions) type {
@@ -24,7 +24,7 @@ pub fn EventerTemplate(comptime options: EventerOptions) type {
         pub const Callback = struct {
             func: CallbackFn,
             data: options.CallbackData,
-            pub fn init(func: CallbackFn, data: CallbackData) @This() {
+            pub fn init(func: CallbackFn, data: options.CallbackData) @This() {
                 return @This() {
                     .func = func,
                     .data = data,
@@ -53,23 +53,23 @@ pub fn EventerTemplate(comptime options: EventerOptions) type {
         }
 
         pub fn add(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerAddError!void {
-            var event = os.epoll_event {
+            var event = os.linux.epoll_event {
                 .events = flags,
-                .data = os.epoll_data { .ptr = @ptrToInt(callback) },
+                .data = os.linux.epoll_data { .ptr = @ptrToInt(callback) },
             };
-            try os.epoll_ctl(self.epollfd, os.EPOLL_CTL_ADD, fd, &event);
+            try os.epoll_ctl(self.epollfd, os.linux.EPOLL.CTL_ADD, fd, &event);
         }
         pub fn modify(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerModifyError!void {
-            var event = os.epoll_event {
+            var event = os.linux.epoll_event {
                 .events = flags,
-                .data = os.epoll_data { .ptr = @ptrToInt(callback) },
+                .data = os.linux.epoll_data { .ptr = @ptrToInt(callback) },
             };
-            try os.epoll_ctl(self.epollfd, os.EPOLL_CTL_MOD, fd, &event);
+            try os.epoll_ctl(self.epollfd, os.linux.EPOLL.CTL_MOD, fd, &event);
         }
 
         pub fn remove(self: *@This(), fd: fd_t) void {
             // TODO: kernels before 2.6.9 had a bug where event must be non-null
-            os.epoll_ctl(self.epollfd, os.EPOLL_CTL_DEL, fd, null) catch |e| switch (e) {
+            os.epoll_ctl(self.epollfd, os.linux.EPOLL.CTL_DEL, fd, null) catch |e| switch (e) {
                 error.FileDescriptorNotRegistered // we could ignore this, but this represents a code bug
                 ,error.FileDescriptorAlreadyPresentInSet
                 ,error.FileDescriptorIncompatibleWithEpoll
@@ -84,7 +84,7 @@ pub fn EventerTemplate(comptime options: EventerOptions) type {
         // returns: false if there was a timeout
         fn handleEventsGeneric(self: *@This(), timeoutMillis: i32) CallbackError!bool {
             // get 1 event at a time to prevent stale events
-            var events : [1]os.epoll_event = undefined;
+            var events : [1]os.linux.epoll_event = undefined;
             const count = os.epoll_wait(self.epollfd, &events, timeoutMillis);
             const errno = os.errno(count);
             switch (errno) {

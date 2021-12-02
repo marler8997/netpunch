@@ -1,9 +1,10 @@
+const builtin = @import("builtin");
 const std = @import("std");
 
 pub const select = @import("eventing/select.zig");
 pub const epoll = @import("eventing/epoll.zig");
 
-pub const default = if (std.builtin.os.tag == .windows) select else epoll;
+pub const default = if (builtin.os.tag == .windows) select else epoll;
 
 pub const EventerOptions = struct {
     // The extra data type that the eventer tracks

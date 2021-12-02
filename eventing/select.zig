@@ -1,13 +1,17 @@
+const builtin = @import("builtin");
 const std = @import("std");
-const builtin = std.builtin;
 const os = std.os;
 
 const common = @import("./common.zig");
 
-usingnamespace if (builtin.os.tag == .windows)
-    @import("./selectwindows.zig")
-else
-    @import("./selectnotwindows.zig");
+const platform = struct {
+    usingnamespace if (builtin.os.tag == .windows)
+        @import("./selectwindows.zig")
+    else
+        @import("./selectnotwindows.zig");
+};
+// just hardcode to 64 for now
+const fd_set = platform.fd_set(64);
 
 pub const EventFlags = struct {
     pub const read = 0x01;
@@ -22,14 +26,14 @@ pub const EventFlags = struct {
 //       pass it as an argument
 pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, comptime CallbackData: type) type {
     return struct {
-        pub const Fd = fd_t;
+        pub const Fd = platform.fd_t;
         pub const Callback = struct {
             func: CallbackFn,
             data: CallbackData,
         };
         pub const CallbackFn = fn(server: *@This(), callback: *Callback) EventError!void;
         const FdInfo = struct {
-            fd: fd_t,
+            fd: platform.fd_t,
             flags: u32,
             callback: *Callback,
         };
@@ -45,7 +49,7 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
             return this;
         }
 
-        fn find(self: @This(), fd: fd_t) ?CountType {
+        fn find(self: @This(), fd: platform.fd_t) ?CountType {
             var i : CountType = 0;
             while (i < self.fdcount) {
                 if (self.fdlist[i].fd == fd)
@@ -54,20 +58,20 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
             return null;
         }
 
-        pub fn add(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerAddError!void {
+        pub fn add(self: *@This(), fd: platform.fd_t, flags: u32, callback: *Callback) common.EventerAddError!void {
             if (self.fdcount == self.fdlist.len)
                 return error.UserResourceLimitReached;
             std.debug.assert(self.find(fd) == null);
             self.fdlist[self.fdcount] = .{ .fd = fd, .flags = flags, .callback = callback };
             self.fdcount += 1;
         }
-        pub fn modify(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerAddError!void {
+        pub fn modify(self: *@This(), fd: platform.fd_t, flags: u32, callback: *Callback) common.EventerAddError!void {
             if (self.find(fd)) |i| {
                 self.fdlist[i].flags = flags;
                 self.fdlist[i].callback = callback;
             } else return error.SocketNotAddedToEventer;
         }
-        pub fn remove(self: *@This(), fd: fd_t) void {
+        pub fn remove(self: *@This(), fd: platform.fd_t) void {
             if (self.find(fd)) |i| {
                 var j = i;
                 while (j + 1 < self.fdcount) {
@@ -82,29 +86,28 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
 
             const nfds = if (builtin.os.tag == .windows) 0 else @compileError("select nfds not implemented for non-windows");
 
-            // for now, just limit this to 64
-            var read_set  : fd_set(64) = .{ .fd_count = 0, .fd_array = undefined };
-            var write_set : fd_set(64) = .{ .fd_count = 0, .fd_array = undefined };
-            var error_set : fd_set(64) = .{ .fd_count = 0, .fd_array = undefined };
+            var read_set  : fd_set = .{ .fd_count = 0, .fd_array = undefined };
+            var write_set : fd_set = .{ .fd_count = 0, .fd_array = undefined };
+            var error_set : fd_set = .{ .fd_count = 0, .fd_array = undefined };
             {var i : CountType = 0; while (i < self.fdcount) : (i += 1) {
                 if ( (self.fdlist[i].flags & EventFlags.read) != 0) {
-                    set_fd(fd_set(64), &read_set, self.fdlist[i].fd);
+                    platform.set_fd(fd_set, &read_set, self.fdlist[i].fd);
                 }
                 if ( (self.fdlist[i].flags & EventFlags.write) != 0) {
-                    set_fd(fd_set(64), &write_set, self.fdlist[i].fd);
+                    platform.set_fd(fd_set, &write_set, self.fdlist[i].fd);
                 }
                 if ( (self.fdlist[i].flags & EventFlags.hangup) != 0) {
-                    set_fd(fd_set(64), &error_set, self.fdlist[i].fd);
+                    platform.set_fd(fd_set, &error_set, self.fdlist[i].fd);
                 }
             }}
-            var timeout_buf : timeval = undefined;
+            var timeout_buf : platform.timeval = undefined;
             const timeout = init: {
                 if (timeout_ms == -1) break :init null;
                 std.debug.assert(timeout_ms >= 0);
-                timeout_buf = msToTimeval(@intCast(u31, timeout_ms));
+                timeout_buf = platform.msToTimeval(@intCast(u31, timeout_ms));
                 break :init &timeout_buf;
             };
-            const result = select(nfds, read_set.base(), write_set.base(), error_set.base(), timeout);
+            const result = platform.select(nfds, read_set.base(), write_set.base(), error_set.base(), timeout);
             if (result == -1) {
                 // TODO: create wrapper function in std.os to handle all error codes
                 std.debug.panic("select failed, lasterror = {}", .{std.os.windows.ws2_32.WSAGetLastError()});
@@ -135,9 +138,9 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
             _ = self;
             std.debug.panic("not implemented", .{});
             //while (true) {
-            //    readSet: fd_set(64), // just hardcode to 64 for now
-            //    writeSet: fd_set(64), // just hardcode to 64 for now
-            //    errorSet: fd_set(64), // just hardcode to 64 for now
+            //    readSet: fd_set,
+            //    writeSet: fd_set,
+            //    errorSet: fd_set,
             //    var events : [16]os.epoll_event = undefined;
             //    //std.debug.warn("[DEBUG] waiting for event...\n", .{});
             //    const count = os.epoll_wait(self.epollfd, &events, -1);

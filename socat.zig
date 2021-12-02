@@ -5,6 +5,7 @@
 //       maybe not since it will make this more complicated and its
 //       main purpose is just for testing
 //
+const builtin = @import("builtin");
 const std = @import("std");
 const mem = std.mem;
 const os = std.os;
@@ -338,7 +339,7 @@ fn usage() void {
 }
 
 pub fn main() anyerror!u8 {
-    if (std.builtin.os.tag == .windows) {
+    if (builtin.os.tag == .windows) {
         _ = try std.os.windows.WSAStartup(2, 2);
     }
 
@@ -389,7 +390,7 @@ pub fn main() anyerror!u8 {
             error.RetryPrepareConnect => continue,
             //error.Retry => continue,
         };
-        defer addr1.unprepareConnect(&addr1Prep);
+        defer global.addr1.unprepareConnect(&addr1Prep);
         switch (sequenceConnectAddr1(&addr1Prep)) {
             //error.Disconnect => continue,
         }

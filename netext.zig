@@ -240,9 +240,9 @@ pub fn listen(sockfd: socket_t, backlog: u31) !void {
 }
 
 pub fn makeListenSock(addr: *std.net.Address, backlog: u31) !socket_t {
-    const sockfd = try socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
+    const sockfd = try socket(addr.any.family, os.SOCK.STREAM, os.IPPROTO.TCP);
     errdefer os.close(sockfd);
-    try setsockopt(sockfd, os.SOL_SOCKET, os.SO_REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
+    try setsockopt(sockfd, os.SOL.SOCKET, os.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
     try bind(sockfd, &addr.any, addr.getOsSockLen());
     try listen(sockfd, backlog);
     return sockfd;

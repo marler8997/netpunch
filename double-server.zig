@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const mem = std.mem;
 const os = std.os;
@@ -11,7 +12,7 @@ const Address = net.Address;
 const EventFlags = eventing.EventFlags;
 const Eventer = eventing.EventerTemplate(.{});
 
-const INVALID_FD = if(std.builtin.os.tag == .windows) std.os.windows.ws2_32.INVALID_SOCKET
+const INVALID_FD = if(builtin.os.tag == .windows) std.os.windows.ws2_32.INVALID_SOCKET
     else -1;
 
 const Client = struct {
@@ -63,7 +64,7 @@ fn onAccept(eventer: *Eventer, callback: *Eventer.Callback) anyerror!void {
     var addr : Address = undefined;
     var addrlen : os.socklen_t = @sizeOf(@TypeOf(addr));
 
-    const newsockfd = try os.accept(global.listenFd, &addr.any, &addrlen, os.SOCK_NONBLOCK);
+    const newsockfd = try os.accept(global.listenFd, &addr.any, &addrlen, os.SOCK.NONBLOCK);
     errdefer common.shutdownclose(newsockfd);
 
     const ClientInfos = struct { newClient: *Client, otherClient: *Client };

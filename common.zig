@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const mem = std.mem;
 const os = std.os;
@@ -26,14 +27,14 @@ pub fn delaySeconds(seconds: u32, msg: []const u8) void {
 }
 
 pub fn makeListenSock(listenAddr: *Address) !socket_t {
-    var flags : u32 = os.SOCK_STREAM;
-    if (std.builtin.os.tag != .windows) {
-        flags = flags | os.SOCK_NONBLOCK;
+    var flags : u32 = os.SOCK.STREAM;
+    if (builtin.os.tag != .windows) {
+        flags = flags | os.SOCK.NONBLOCK;
     }
-    const sockfd = try os.socket(listenAddr.any.family, flags, os.IPPROTO_TCP);
+    const sockfd = try os.socket(listenAddr.any.family, flags, os.IPPROTO.TCP);
     errdefer os.close(sockfd);
-    if (std.builtin.os.tag != .windows) {
-        try os.setsockopt(sockfd, os.SOL_SOCKET, os.SO_REUSEADDR, &mem.toBytes(@as(c_int, 1)));
+    if (builtin.os.tag != .windows) {
+        try os.setsockopt(sockfd, os.SOL.SOCKET, os.SO.REUSEADDR, &mem.toBytes(@as(c_int, 1)));
     }
     os.bind(sockfd, &listenAddr.any, listenAddr.getOsSockLen()) catch |e| {
         std.debug.warn("bind to address '{}' failed: {}\n", .{listenAddr, e});
@@ -49,7 +50,7 @@ pub fn makeListenSock(listenAddr: *Address) !socket_t {
 pub fn getsockerror(sockfd: socket_t) !c_int {
     var errorCode : c_int = undefined;
     var resultLen : os.socklen_t = @sizeOf(c_int);
-    switch (os.errno(os.linux.getsockopt(sockfd, os.SOL_SOCKET, os.SO_ERROR, @ptrCast([*]u8, &errorCode), &resultLen))) {
+    switch (os.errno(os.linux.getsockopt(sockfd, os.SOL.SOCKET, os.SO.ERROR, @ptrCast([*]u8, &errorCode), &resultLen))) {
         0 => return errorCode,
         .EBADF => unreachable,
         .EFAULT => unreachable,
@@ -66,7 +67,7 @@ pub fn connect(sockfd: socket_t, addr: *const Address) os.ConnectError!void {
 pub fn connectHost(host: []const u8, port: u16) !socket_t {
     // so far only ipv4 addresses supported
     if (Address.parseIp(host, port)) |addr| {
-        const sockfd = try os.socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
+        const sockfd = try os.socket(addr.any.family, os.SOCK.STREAM, os.IPPROTO.TCP);
         errdefer os.close(sockfd);
         try os.connect(sockfd, &addr.any, addr.getOsSockLen());
         return sockfd;
@@ -109,7 +110,7 @@ pub const ShutdownError = error{
 } || std.os.UnexpectedError;
 
 pub fn shutdown(sockfd: socket_t) ShutdownError!void {
-    if (std.builtin.os.tag == .windows) {
+    if (builtin.os.tag == .windows) {
         const result = extern_windows.shutdown(sockfd, extern_windows.SD_BOTH);
         if (0 != result) switch (std.os.windows.ws2_32.WSAGetLastError()) {
             .WSAECONNABORTED => return error.ConnectionAborted,
@@ -122,7 +123,7 @@ pub fn shutdown(sockfd: socket_t) ShutdownError!void {
             .WSANOTINITIALISED => unreachable,
             else => |err| return std.os.windows.unexpectedWSAError(err),
         };
-    } else switch (os.errno(os.linux.shutdown(sockfd, os.SHUT_RDWR))) {
+    } else switch (os.errno(os.linux.shutdown(sockfd, os.SHUT.RDWR))) {
         .SUCCESS => return,
         .BADF => unreachable,
         .INVAL => return error.InvalidShutdownHow,
@@ -186,7 +187,7 @@ fn waitGenericTimeout(fd: fd_t, timeoutMillis: i32, events: i16) !bool {
 
 // returns: true if readable, false on timeout
 pub fn waitReadableTimeout(fd: fd_t, timeoutMillis: i32) !bool {
-    return waitGenericTimeout(fd, timeoutMillis, os.POLLIN);
+    return waitGenericTimeout(fd, timeoutMillis, os.POLL.IN);
 }
 pub fn waitReadable(fd: fd_t) !void {
     if (!try waitReadableTimeout(fd, -1))
@@ -194,7 +195,7 @@ pub fn waitReadable(fd: fd_t) !void {
 }
 
 pub fn waitWriteableTimeout(fd: fd_t, timeoutMillis: i32) !bool {
-    return waitGenericTimeout(fd, timeoutMillis, os.POLLOUT);
+    return waitGenericTimeout(fd, timeoutMillis, os.POLL.OUT);
 }
 
 pub fn recvfullTimeout(sockfd: socket_t, buf: []u8, timeoutMillis: u32) !bool {

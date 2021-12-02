@@ -47,10 +47,10 @@ const global = struct {
 
 
 fn setupSignals() void {
-    global.ignoreSigaction.handler.sigaction = os.SIG_IGN;
+    global.ignoreSigaction.handler.sigaction = os.SIG.IGN;
     std.mem.set(u32, &global.ignoreSigaction.mask, 0);
     global.ignoreSigaction.flags = 0;
-    os.sigaction(os.SIGPIPE, &global.ignoreSigaction, null);
+    os.sigaction(os.SIG.PIPE, &global.ignoreSigaction, null);
 }
 
 fn usage() void {
@@ -141,7 +141,7 @@ fn sequenceConnectRawClient(punchFd: fd_t, heartbeatTimer: *Timer, punchRecvStat
     PunchSocketDisconnect,
     RawSocketDisconnect,
 } {
-    const rawFd = netext.socket(global.rawForwardAddr.any.family, os.SOCK_STREAM , os.IPPROTO_TCP) catch |e| switch (e) {
+    const rawFd = netext.socket(global.rawForwardAddr.any.family, os.SOCK.STREAM , os.IPPROTO.TCP) catch |e| switch (e) {
         error.Retry => return error.RawSocketDisconnect,
     };
     defer os.close(rawFd);

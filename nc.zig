@@ -5,6 +5,7 @@
 //       maybe not since it will make this more complicated and its
 //       main purpose is just for testing
 //
+const builtin = @import("builtin");
 const std = @import("std");
 const mem = std.mem;
 const os = std.os;
@@ -76,10 +77,10 @@ pub fn main() anyerror!u8 {
                 return 1;
             }
             var addr = Address.initIp4([4]u8{0,0,0,0}, listenPort);
-            const listenFd = try os.socket(addr.any.family, os.SOCK_STREAM, os.IPPROTO_TCP);
+            const listenFd = try os.socket(addr.any.family, os.SOCK.STREAM, os.IPPROTO.TCP);
             defer os.close(listenFd);
-            if (std.builtin.os.tag != .windows) {
-                try os.setsockopt(listenFd, os.SOL_SOCKET, os.SO_REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
+            if (builtin.os.tag != .windows) {
+                try os.setsockopt(listenFd, os.SOL.SOCKET, os.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
             }
             try os.bind(listenFd, &addr.any, addr.getOsSockLen());
             try os.listen(listenFd, 1);
