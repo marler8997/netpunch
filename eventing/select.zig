@@ -4,6 +4,9 @@ const os = std.os;
 
 const common = @import("./common.zig");
 
+const eventing = @import("../eventing.zig");
+const EventerOptions = eventing.EventerOptions;
+
 const platform = struct {
     usingnamespace if (builtin.os.tag == .windows)
         @import("./selectwindows.zig")
@@ -24,14 +27,22 @@ pub const EventFlags = struct {
 //       than passing it by default
 //       some programs only have 1 eventer and don't need to
 //       pass it as an argument
-pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, comptime CallbackData: type) type {
+pub fn EventerTemplate(comptime options: EventerOptions) type {
     return struct {
         pub const Fd = platform.fd_t;
+        pub const Data = options.Data;
+        pub const CallbackError = options.CallbackError;
+        pub const CallbackFn = fn(server: *@This(), callback: *Callback) CallbackError!void;
         pub const Callback = struct {
             func: CallbackFn,
-            data: CallbackData,
+            data: options.CallbackData,
+            pub fn init(func: CallbackFn, data: options.CallbackData) @This() {
+                return @This() {
+                    .func = func,
+                    .data = data,
+                };
+            }
         };
-        pub const CallbackFn = fn(server: *@This(), callback: *Callback) EventError!void;
         const FdInfo = struct {
             fd: platform.fd_t,
             flags: u32,
@@ -40,18 +51,19 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
         const CountType = u8;
 
         /// data that can be shared between all callbacks
-        eventerData: EventerData,
+        data: Data,
         fdlist: [64]FdInfo,
         fdcount: CountType,
-        pub fn init(eventerData: EventerData) !@This() {
+        pub fn init(data: Data) !@This() {
             var this : @This() = undefined;
-            this.eventerData = eventerData;
+            this.data = data;
+            this.fdcount = 0;
             return this;
         }
 
         fn find(self: @This(), fd: platform.fd_t) ?CountType {
             var i : CountType = 0;
-            while (i < self.fdcount) {
+            while (i < self.fdcount) : (i += 1) {
                 if (self.fdlist[i].fd == fd)
                     return i;
             }
@@ -82,7 +94,7 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
         }
 
         // returns: false if there was a timeout
-        fn handleEventsGeneric(self: *@This(), timeout_ms: i32) EventError!bool {
+        fn handleEventsGeneric(self: *@This(), timeout_ms: i32) CallbackError!bool {
 
             const nfds = if (builtin.os.tag == .windows) 0 else @compileError("select nfds not implemented for non-windows");
 
@@ -118,7 +130,7 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
                 return false; // timeout
 
             var left = result;
-            while (left > 0) {
+            while (left > 0) : (left -= 1) {
                 // TODO: prevent sockets from being called multiple times from different sets?
                 for (read_set.fd_array[0..read_set.fd_count]) |fd| {
                     if (self.find(fd)) |i| {
@@ -129,9 +141,9 @@ pub fn EventerTemplate(comptime EventError: type, comptime EventerData: type, co
             return true;
         }
 
-        pub fn handleEventsNoTimeout(self: *@This()) EventError!void {
+        pub fn handleEventsNoTimeout(self: *@This()) CallbackError!void {
             if (!try self.handleEventsGeneric(-1))
-                std.debug.panic("epoll returned 0 with ifinite timeout?", .{});
+                std.debug.panic("select returned 0 with ifinite timeout?", .{});
         }
 
         pub fn loop(self: *@This()) anyerror!void {

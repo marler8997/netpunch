@@ -81,7 +81,7 @@ const extern_windows = struct {
     pub extern "ws2_32" fn shutdown(
         s: socket_t,
         how: c_int
-    ) callconv(.Stdcall) c_int;
+    ) callconv(os.windows.WINAPI) c_int;
     pub const SD_BOTH = 2;
 };
 
@@ -139,10 +139,39 @@ pub fn shutdownclose(sockfd: socket_t) void {
     os.close(sockfd);
 }
 
+// workaround https://github.com/ziglang/zig/issues/9971
+fn sendWorkaround(sockfd: socket_t, buf: []const u8, flags: u32) os.SendError!usize {
+    if (builtin.os.tag == .windows) {
+        const rc = os.windows.ws2_32.send(sockfd, buf.ptr, @intCast(i32, buf.len), flags);
+        if (rc != os.windows.ws2_32.SOCKET_ERROR)
+            return @intCast(usize, rc);
+
+        switch (os.windows.ws2_32.WSAGetLastError()) {
+            .WSAEACCES => return error.AccessDenied,
+            .WSAECONNRESET => return error.ConnectionResetByPeer,
+            .WSAEMSGSIZE => return error.MessageTooBig,
+            .WSAENOBUFS => return error.SystemResources,
+            .WSAENOTSOCK => return error.FileDescriptorNotASocket,
+            .WSAEFAULT => unreachable, // The lpBuffers, lpTo, lpOverlapped, lpNumberOfBytesSent, or lpCompletionRoutine parameters are not part of the user address space, or the lpTo parameter is too small.
+            .WSAEHOSTUNREACH => unreachable,
+            // TODO: WSAEINPROGRESS, WSAEINTR
+            .WSAEINVAL => unreachable,
+            .WSAENETDOWN => return error.NetworkSubsystemFailed,
+            .WSAENETRESET => return error.ConnectionResetByPeer,
+            .WSAENOTCONN => unreachable,
+            .WSAESHUTDOWN => unreachable, // The socket has been shut down; it is not possible to WSASendTo on a socket after shutdown has been invoked with how set to SD_SEND or SD_BOTH.
+            .WSAEWOULDBLOCK => return error.WouldBlock,
+            .WSANOTINITIALISED => unreachable, // A successful WSAStartup call must occur before using this function.
+            else => |err| return os.windows.unexpectedWSAError(err),
+        }
+    }
+    return os.send(sockfd, buf, flags);
+}
+
 pub fn sendfull(sockfd: socket_t, buf: []const u8, flags: u32) !void {
     var totalSent : usize = 0;
     while (totalSent < buf.len) {
-        const lastSent = try os.send(sockfd, buf[totalSent..], flags);
+        const lastSent = try sendWorkaround(sockfd, buf[totalSent..], flags);
         if (lastSent == 0)
             return error.SendReturnedZero;
         totalSent += lastSent;

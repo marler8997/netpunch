@@ -33,7 +33,7 @@ pub extern "ws2_32" fn select(
     writefds: *fd_base_set,
     exceptfds: *fd_base_set,
     timeout: ?*const timeval,
-) callconv(.Stdcall) c_int;
+) callconv(os.windows.WINAPI) c_int;
 
 pub fn set_fd(comptime SetType: type, set: *SetType, s: fd_t) void {
     set.fd_array[set.fd_count] = s;
