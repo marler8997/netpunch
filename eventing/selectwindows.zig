@@ -13,7 +13,7 @@ pub fn fd_set(comptime setSize: comptime_int) type {
         fd_count: c_uint,
         fd_array: [setSize]fd_t,
         pub fn base(self: *@This()) *fd_base_set {
-            return @ptrCast(*fd_base_set, self);
+            return @ptrCast(self);
         }
         pub fn add(self: *@This(), fd: fd_t) void {
             self.fd_array[self.fd_count] = fd;

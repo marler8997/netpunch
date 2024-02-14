@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 
 const logging = @import("./logging.zig");
@@ -6,7 +7,7 @@ const log = logging.log;
 /// TODO: these functions should go somewhere else
 pub fn SignModified(comptime T: type, comptime signedness: std.builtin.Signedness) type {
     return switch (@typeInfo(T)) {
-        .Int => |info| @Type(std.builtin.TypeInfo{.Int = .{
+        .Int => |info| @Type(std.builtin.Type{.Int = .{
             .signedness = signedness,
             .bits = info.bits,
         }}),
@@ -16,11 +17,15 @@ pub fn SignModified(comptime T: type, comptime signedness: std.builtin.Signednes
 pub fn Signed  (comptime T: type) type { return SignModified(T, .signed ); }
 pub fn Unsigned(comptime T: type) type { return SignModified(T, .unsigned); }
 
-pub const Timestamp = @typeInfo(@TypeOf(std.time.milliTimestamp)).Fn.return_type.?;
+pub const Timestamp = switch (builtin.os.tag) {
+    .windows => u32,
+    else => usize,
+};
 pub const TimestampDiff = Signed(Timestamp);
 
 pub fn getNowTimestamp() Timestamp {
-    return std.time.milliTimestamp();
+    if (builtin.os.tag == .windows) return std.os.windows.GetTickCount();
+    return std.time.Instant.now().timestamp;
 }
 
 pub fn timestampToMillis(timestamp: Timestamp) Timestamp {
@@ -30,42 +35,67 @@ pub fn secondsToTimestamp(value: anytype) Timestamp {
     return 1000 * value;
 }
 
-// 2's complement negate
 pub fn negate(val: anytype) @TypeOf(val) {
-    var result : @TypeOf(val) = undefined;
-    _ = @addWithOverflow(@TypeOf(val), ~val, 1, &result);
-    return result;
+    return -%val;
 }
 
 pub fn timestampDiff(left: Timestamp, right: Timestamp) TimestampDiff {
-    var result : Timestamp = undefined;
-    _ = @subWithOverflow(Timestamp, left, right, &result);
-    return @intCast(TimestampDiff, result);
+    return @bitCast(left -% right);
+}
+
+fn testTimestampDiff(expected: TimestampDiff, left: Timestamp, right: Timestamp) !void {
+//    std.debug.print(
+//        "left {} right {} expected diff {} negate(diff) {}\n",
+//        .{left, right, expected, negate(expected)},
+//    );
+//    std.debug.print(" {}\n", .{timestampDiff(left , right)});
+//    std.debug.print(" {}\n", .{timestampDiff(right, left )});
+    std.debug.assert(timestampDiff(left , right) == expected);
+    std.debug.assert(timestampDiff(right, left ) == -%expected);
 }
 
 test "timestampDiff" {
-    const Test = struct { left: Timestamp, right: Timestamp, diff: TimestampDiff };
-    const tests = [_]Test {
-        Test {.left=  0, .right= 0, .diff= 0},
-        Test {.left=  1, .right= 0, .diff= 1},
-        Test {.left=100, .right=83, .diff=17},
-        Test {.left=std.math.maxInt(Timestamp)     , .right=std.math.maxInt(Timestamp)      , .diff=0},
-        Test {.left=std.math.maxInt(Timestamp)     , .right=std.math.maxInt(Timestamp) -   1, .diff=1},
-        Test {.left=std.math.maxInt(Timestamp) - 80, .right=std.math.maxInt(Timestamp) - 223, .diff=143},
-        Test {.left=0, .right=std.math.maxInt(Timestamp), .diff=1},
-        Test {.left=1234, .right=std.math.maxInt(Timestamp) - 100, .diff=1335},
-        Test {.left=std.math.maxInt(Timestamp)/2, .right=0, .diff=std.math.maxInt(Timestamp)/2},
-        Test {.left=std.math.maxInt(Timestamp)/2, .right=123, .diff=std.math.maxInt(Timestamp)/2 - 123},
-        Test {.left=std.math.maxInt(Timestamp)/2 + 234, .right=234, .diff=std.math.maxInt(Timestamp)/2},
-        Test {.left=std.math.maxInt(Timestamp)/2 + 1, .right=0, .diff=std.math.minInt(TimestampDiff)},
-        Test {.left=std.math.maxInt(Timestamp)/2 + 2, .right=0, .diff=std.math.minInt(TimestampDiff) + 1},
+    try testTimestampDiff(   0, 0, 0);
+    try testTimestampDiff(   1, 1, 0);
+    try testTimestampDiff(  17, 100, 83);
+    try testTimestampDiff(   0, std.math.maxInt(Timestamp)     , std.math.maxInt(Timestamp)      );
+    try testTimestampDiff(   1, std.math.maxInt(Timestamp)     , std.math.maxInt(Timestamp) -   1);
+    try testTimestampDiff( 143, std.math.maxInt(Timestamp) - 80, std.math.maxInt(Timestamp) - 223);
+    try testTimestampDiff(   1, 0, std.math.maxInt(Timestamp));
+    try testTimestampDiff(1335, 1234, std.math.maxInt(Timestamp) - 100);
+    try testTimestampDiff(std.math.maxInt(Timestamp) / 2      , std.math.maxInt(Timestamp)/2      ,   0);
+    try testTimestampDiff(std.math.maxInt(Timestamp) / 2 - 123, std.math.maxInt(Timestamp)/2      , 123);
+    try testTimestampDiff(std.math.maxInt(Timestamp) / 2      , std.math.maxInt(Timestamp)/2 + 234, 234);
+    try testTimestampDiff(std.math.minInt(TimestampDiff)    , std.math.maxInt(Timestamp)/2 + 1, 0);
+    try testTimestampDiff(std.math.minInt(TimestampDiff) + 1, std.math.maxInt(Timestamp)/2 + 2, 0);
+
+    const extreme_offsets = [_]Timestamp{
+        0, 1, 2,
+        0xff, 0xffff, 0xffffff,
+        std.math.maxInt(TimestampDiff) - 1,
+        std.math.maxInt(TimestampDiff),
+        std.math.maxInt(TimestampDiff) + 1,
+        std.math.maxInt(Timestamp) - 1,
+        std.math.maxInt(Timestamp),
     };
-    for (tests) |t| {
-        std.debug.warn("left {} right {} diff {} ndiff {}\n", .{t.left, t.right, t.diff, negate(t.diff)});
-        std.debug.warn(" {}\n", .{timestampDiff(t.left , t.right)});
-        std.debug.warn(" {}\n", .{timestampDiff(t.right, t.left )});
-        std.debug.assert(timestampDiff(t.left , t.right) ==   t.diff);
-        std.debug.assert(timestampDiff(t.right, t.left ) ==  negate(t.diff));
+    for (extreme_offsets) |offset| {
+        // The tests below should all pass regardless of what value we offset from.
+        try testTimestampDiff(         0, offset +%          0, offset);
+        try testTimestampDiff(         1, offset +%          1, offset);
+        try testTimestampDiff(         2, offset +%          2, offset);
+        try testTimestampDiff(    0xffff, offset +%    0xffff, offset);
+        try testTimestampDiff(0x7fffffff, offset +% 0x7fffffff, offset);
+        for (extreme_offsets) |offset2| {
+            try testTimestampDiff(@bitCast(offset2), offset +% offset2, offset);
+        }
+
+        // the interpretation of what's newer changes when the difference
+        // exceeds half that of std.math.maxInt(Timestamp)/2.
+        try testTimestampDiff(         1,     offset, offset +% std.math.maxInt(Timestamp));
+        try testTimestampDiff(         2, offset +% 1, offset +% std.math.maxInt(Timestamp));
+        try testTimestampDiff(         2,     offset, offset +% (std.math.maxInt(Timestamp)-1));
+        try testTimestampDiff(std.math.maxInt(TimestampDiff)    ,     offset, offset +% std.math.maxInt(TimestampDiff)+%2);
+        try testTimestampDiff(std.math.maxInt(TimestampDiff) -% 1,     offset, offset +% std.math.maxInt(TimestampDiff)+%3);
     }
 }
 
@@ -97,7 +127,7 @@ pub const Timer = struct {
             self.lastExpireTimestamp = nowMillis;
             return TimerCheckResult.Expired;
         }
-        return TimerCheckResult { .Wait = self.durationMillis - @intCast(u32, diff) };
+        return TimerCheckResult { .Wait = self.durationMillis - @as(u32, diff) };
     }
 };
 
@@ -135,7 +165,7 @@ pub fn TimersTemplate(comptime CallbackData: type) type {
                 if (self.optionalNext) |next| {
                     const diff = timestampDiff(next.timestamp, getNowTimestamp());
                     //std.debug.warn("[DEBUG] timestamp diff {}\n", .{diff});
-                    if (diff > 0) return @intCast(Timestamp, diff);
+                    if (diff > 0) return @intCast(diff);
                     self.optionalNext = next.optionalNext;
                     try next.func(self, next);
                 } else {
@@ -193,7 +223,7 @@ pub const Throttler = struct {
             if (elapsedMillis < 0) {
                 if (self.logPrefix.len > 0)
                     log("{s}elapsed time is negative ({} ms), will wait {} ms...", .{self.logPrefix, elapsedMillis, self.desiredSleepMillis});
-                std.time.sleep(ns_per_ms * @intCast(u64, self.desiredSleepMillis));
+                std.time.sleep(ns_per_ms * @as(u64, self.desiredSleepMillis));
                 self.sleepMillis = 0; // reset sleep time
             } else if (elapsedMillis >= self.desiredSleepMillis) {
                 const workMillis = timestampDiff(nowMillis, self.beforeWorkTimestamp);
@@ -201,17 +231,17 @@ pub const Throttler = struct {
                 if (workMillis >= self.desiredSleepMillis) {
                     self.sleepMillis = 0;
                 } else {
-                    self.sleepMillis = self.desiredSleepMillis - @intCast(Timestamp, workMillis);
+                    self.sleepMillis = self.desiredSleepMillis - @as(Timestamp, workMillis);
                 }
                 if (self.logPrefix.len > 0)
                     log("{s}last operation took {} ms, no throttling needed (next sleep {} ms)...", .{self.logPrefix, workMillis, self.sleepMillis});
             } else {
-                const millisNeeded = self.desiredSleepMillis - @intCast(Timestamp, elapsedMillis);
+                const millisNeeded = self.desiredSleepMillis - @as(Timestamp, elapsedMillis);
                 const addMillis = if (millisNeeded < self.slowRateMillis) millisNeeded else self.slowRateMillis;
                 self.sleepMillis += addMillis;
                 if (self.logPrefix.len > 0)
                     log("{s}{} ms since last operation, will sleep {} ms...", .{self.logPrefix, elapsedMillis, self.sleepMillis});
-                std.time.sleep(ns_per_ms * @intCast(u64, self.sleepMillis));
+                std.time.sleep(ns_per_ms * @as(u64, self.sleepMillis));
             }
         }
         self.checkinTimestamp = nowMillis;

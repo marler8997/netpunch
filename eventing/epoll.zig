@@ -31,7 +31,7 @@ pub fn EventerTemplate(comptime options: EventerOptions) type {
                 };
             }
         };
-        pub const CallbackFn = fn(server: *@This(), callback: *Callback) CallbackError!void;
+        pub const CallbackFn = *const fn(server: *@This(), callback: *Callback) CallbackError!void;
 
         /// data that can be shared between all callbacks
         data: Data,
@@ -55,14 +55,14 @@ pub fn EventerTemplate(comptime options: EventerOptions) type {
         pub fn add(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerAddError!void {
             var event = os.linux.epoll_event {
                 .events = flags,
-                .data = os.linux.epoll_data { .ptr = @ptrToInt(callback) },
+                .data = os.linux.epoll_data { .ptr = @intFromPtr(callback) },
             };
             try os.epoll_ctl(self.epollfd, os.linux.EPOLL.CTL_ADD, fd, &event);
         }
         pub fn modify(self: *@This(), fd: fd_t, flags: u32, callback: *Callback) common.EventerModifyError!void {
             var event = os.linux.epoll_event {
                 .events = flags,
-                .data = os.linux.epoll_data { .ptr = @ptrToInt(callback) },
+                .data = os.linux.epoll_data { .ptr = @intFromPtr(callback) },
             };
             try os.epoll_ctl(self.epollfd, os.linux.EPOLL.CTL_MOD, fd, &event);
         }
@@ -99,13 +99,13 @@ pub fn EventerTemplate(comptime options: EventerOptions) type {
             if (count == 0)
                 return false; // timeout
             for (events[0..count]) |event| {
-                const callback = @intToPtr(*Callback, event.data.ptr);
+                const callback: *Callback = @ptrFromInt(event.data.ptr);
                 try callback.func(self, callback);
             }
             return true; // was not a timeout
         }
         pub fn handleEvents(self: *@This(), timeoutMillis: u32) CallbackError!bool {
-            return self.handleEventsGeneric(@intCast(i32, timeoutMillis));
+            return self.handleEventsGeneric(@intCast(timeoutMillis));
         }
 
         pub fn handleEventsNoTimeout(self: *@This()) CallbackError!void {

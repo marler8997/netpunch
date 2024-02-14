@@ -23,7 +23,7 @@ pub fn skipOver(comptime T: type, haystack: *T, needle: []const u8) bool {
 
 pub fn delaySeconds(seconds: u32, msg: []const u8) void {
     log("waiting {} seconds {s}", .{seconds, msg});
-    std.time.sleep(@intCast(u64, seconds) * std.time.ns_per_s);
+    std.time.sleep(@as(u64, seconds) * std.time.ns_per_s);
 }
 
 pub fn makeListenSock(listenAddr: *Address) !socket_t {
@@ -50,7 +50,13 @@ pub fn makeListenSock(listenAddr: *Address) !socket_t {
 pub fn getsockerror(sockfd: socket_t) !c_int {
     var errorCode : c_int = undefined;
     var resultLen : os.socklen_t = @sizeOf(c_int);
-    switch (os.errno(os.linux.getsockopt(sockfd, os.SOL.SOCKET, os.SO.ERROR, @ptrCast([*]u8, &errorCode), &resultLen))) {
+    switch (os.errno(os.linux.getsockopt(
+        sockfd,
+        os.SOL.SOCKET,
+        os.SO.ERROR,
+        @ptrCast(&errorCode),
+        &resultLen,
+    ))) {
         0 => return errorCode,
         .EBADF => unreachable,
         .EFAULT => unreachable,
@@ -142,9 +148,10 @@ pub fn shutdownclose(sockfd: socket_t) void {
 // workaround https://github.com/ziglang/zig/issues/9971
 fn sendWorkaround(sockfd: socket_t, buf: []const u8, flags: u32) os.SendError!usize {
     if (builtin.os.tag == .windows) {
-        const rc = os.windows.ws2_32.send(sockfd, buf.ptr, @intCast(i32, buf.len), flags);
+        const len = std.math.cast(i32, buf.len) orelse std.math.maxInt(i32);
+        const rc = os.windows.ws2_32.send(sockfd, buf.ptr, len, flags);
         if (rc != os.windows.ws2_32.SOCKET_ERROR)
-            return @intCast(usize, rc);
+            return @intCast(rc);
 
         switch (os.windows.ws2_32.WSAGetLastError()) {
             .WSAEACCES => return error.AccessDenied,
@@ -230,13 +237,15 @@ pub fn waitWriteableTimeout(fd: fd_t, timeoutMillis: i32) !bool {
 pub fn recvfullTimeout(sockfd: socket_t, buf: []u8, timeoutMillis: u32) !bool {
     var newTimeoutMillis = timeoutMillis;
     var totalReceived : usize = 0;
-    while (newTimeoutMillis > @intCast(u32, std.math.maxInt(i32))) {
+    while (newTimeoutMillis > @as(u32, @intCast(std.math.maxInt(i32)))) {
         const received = try recvfullTimeoutHelper(sockfd, buf[totalReceived..], std.math.maxInt(i32));
         totalReceived += received;
         if (totalReceived == buf.len) return true;
         newTimeoutMillis -= std.math.maxInt(i32);
     }
-    totalReceived += try recvfullTimeoutHelper(sockfd, buf[totalReceived..], @intCast(i32, newTimeoutMillis));
+    totalReceived += try recvfullTimeoutHelper(
+        sockfd, buf[totalReceived..], @intCast(newTimeoutMillis)
+    );
     return totalReceived == buf.len;
 }
 fn recvfullTimeoutHelper(sockfd: socket_t, buf: []u8, timeoutMillis: i32) !usize {
@@ -262,7 +271,7 @@ fn recvfullTimeoutHelper(sockfd: socket_t, buf: []u8, timeoutMillis: i32) !usize
 pub fn getOptArg(args: anytype, i: *usize) !@TypeOf(args[0]) {
     i.* += 1;
     if (i.* >= args.len) {
-        std.debug.warn("Error: option '{s}' requires an argument\n", .{args[i.* - 1]});
+        std.debug.print("Error: option '{s}' requires an argument\n", .{args[i.* - 1]});
         return error.CommandLineOptionMissingArgument;
     }
     return args[i.*];

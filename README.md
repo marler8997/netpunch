@@ -1,8 +1,3 @@
-
-# TODO
-
-I need to fix timestamp semantics after `std.time.milliTimestamp` was changed to a signed type.  I need to fix `zig test timing.zig`.
-
 # Punch Protocol
 
 Connection is initiated with a handshake. 8 bytes for the punch protocol magic value `0x8ec04ff4a00e8694`, then 1-byte indicating which role the endpoint is taking.  `0` for the initiator role which will be opening tunnels, and `1` for the forwarder role which will accept OpenTunnel messages and forward the tunnel data to another endpoint.
